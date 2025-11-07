@@ -1,0 +1,20 @@
+# search_config.yaml
+search_name: "initial_model_sweep"
+
+data:
+  path: "/data/images/"
+  batch_size: [32, 64] # A list of options
+
+models: # A list of model 'objects'
+  - name: "ResNet50"
+    pretrained: true
+  - name: "VGG16"
+    pretrained: true
+
+hyperparameters:
+  optimizer: ["Adam", "SGD"]
+  learning_rate: [0.01, 0.001]
+  epochs: 10 # This is a fixed value
+
+output:
+  base_dir: "/results/sweeps/"
