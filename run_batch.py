@@ -13,6 +13,7 @@ import json
 import time
 from pathlib import Path
 from utils import train_model
+import torch
 
 
 def run_experiment(config_path):
@@ -21,7 +22,7 @@ def run_experiment(config_path):
     print(f"Starting experiment: {config_path}")
     print(f"{'='*60}\n")
 
-    with open(config_path, 'r') as f:
+    with open(config_path, "r") as f:
         options = json.load(f)
 
     start_time = time.time()
@@ -30,7 +31,7 @@ def run_experiment(config_path):
 
     print(f"\nExperiment completed in {elapsed/60:.1f} minutes")
     print(f"Results saved to: results/{options['experiment_name']}/")
-
+    torch.cuda.empty_cache()
     return results
 
 
@@ -57,22 +58,26 @@ def main():
         print(f"\n[{i}/{len(config_paths)}] ", end="")
         try:
             results = run_experiment(config_path)
-            all_results.append({'config': config_path, 'results': results, 'status': 'success'})
+            all_results.append(
+                {"config": config_path, "results": results, "status": "success"}
+            )
         except Exception as e:
             print(f"Error running {config_path}: {e}")
-            all_results.append({'config': config_path, 'error': str(e), 'status': 'failed'})
+            all_results.append(
+                {"config": config_path, "error": str(e), "status": "failed"}
+            )
 
     # Summary
     print(f"\n{'='*60}")
     print("Batch Summary")
     print(f"{'='*60}")
-    successful = sum(1 for r in all_results if r['status'] == 'success')
+    successful = sum(1 for r in all_results if r["status"] == "success")
     print(f"Completed: {successful}/{len(config_paths)} experiments")
 
     for r in all_results:
-        status = "OK" if r['status'] == 'success' else "FAILED"
+        status = "OK" if r["status"] == "success" else "FAILED"
         print(f"  [{status}] {r['config']}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
