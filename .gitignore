@@ -1,4 +1,5 @@
-<<<<<<< HEAD
+/final_split_dataset
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -206,8 +207,3 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
-=======
-final_split_dataset/*
-*.err
-*.out
->>>>>>> bbc15cb (.gitignore)

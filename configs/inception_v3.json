@@ -1,0 +1,32 @@
+{
+    "experiment_name": "inception_v3_frozen",
+    "model": {
+        "backbone": "inception_v3",
+        "pretrained": true,
+        "freeze_backbone": true,
+        "classifier_hidden": [1024],
+        "dropout": 0.2
+    },
+    "data": {
+        "path": "/scratch/hl98745/data/final_split_dataset",
+        "input_size": 299,
+        "batch_size": 32,
+        "num_workers": 4
+    },
+    "augmentations": {
+        "horizontal_flip": true,
+        "vertical_flip": false,
+        "random_rotation": 15,
+        "color_jitter": 0.1,
+        "random_crop_scale": [0.8, 1.0]
+    },
+    "training": {
+        "epochs": 50,
+        "learning_rate": 0.0001,
+        "optimizer": "adamw",
+        "weight_decay": 0.01,
+        "scheduler": "cosine",
+        "seed": 42,
+        "early_stopping_patience": 20
+    }
+}
