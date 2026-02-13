@@ -14,7 +14,8 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-from torch.cuda.amp import GradScaler, autocast
+from torch.amp.grad_scaler import GradScaler
+from torch.amp.autocast_mode import autocast
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
@@ -24,6 +25,7 @@ from .model_utils import load_model, count_parameters
 # ---------------------------------------------------------------------------
 # Reproducibility
 # ---------------------------------------------------------------------------
+
 
 def set_seed(seed):
     """Set random seeds for reproducibility."""
@@ -39,6 +41,7 @@ def set_seed(seed):
 # Data Loading
 # ---------------------------------------------------------------------------
 
+
 def build_train_transforms(options):
     """
     Build training data transforms from config.
@@ -46,13 +49,13 @@ def build_train_transforms(options):
     Applies augmentations specified in options['augmentations'],
     then normalizes with ImageNet statistics.
     """
-    input_size = options['data']['input_size']
-    aug = options.get('augmentations', {})
+    input_size = options["data"]["input_size"]
+    aug = options.get("augmentations", {})
 
     transform_list = []
 
     # Random crop with scale
-    crop_scale = aug.get('random_crop_scale')
+    crop_scale = aug.get("random_crop_scale")
     if crop_scale:
         transform_list.append(
             transforms.RandomResizedCrop(input_size, scale=tuple(crop_scale))
@@ -61,33 +64,32 @@ def build_train_transforms(options):
         transform_list.append(transforms.Resize((input_size, input_size)))
 
     # Horizontal flip
-    if aug.get('horizontal_flip', False):
+    if aug.get("horizontal_flip", False):
         transform_list.append(transforms.RandomHorizontalFlip())
 
     # Vertical flip
-    if aug.get('vertical_flip', False):
+    if aug.get("vertical_flip", False):
         transform_list.append(transforms.RandomVerticalFlip())
 
     # Random rotation
-    rotation = aug.get('random_rotation', 0)
+    rotation = aug.get("random_rotation", 0)
     if rotation > 0:
         transform_list.append(transforms.RandomRotation(rotation))
 
     # Color jitter
-    jitter = aug.get('color_jitter', 0)
+    jitter = aug.get("color_jitter", 0)
     if jitter > 0:
         transform_list.append(
             transforms.ColorJitter(jitter, jitter, jitter, jitter * 0.5)
         )
 
     # Standard normalization
-    transform_list.extend([
-        transforms.ToTensor(),
-        transforms.Normalize(
-            mean=[0.485, 0.456, 0.406],
-            std=[0.229, 0.224, 0.225]
-        )
-    ])
+    transform_list.extend(
+        [
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ]
+    )
 
     return transforms.Compose(transform_list)
 
@@ -98,18 +100,17 @@ def build_eval_transforms(options):
 
     Resizes slightly larger then center crops to input_size.
     """
-    input_size = options['data']['input_size']
+    input_size = options["data"]["input_size"]
     resize_size = int(input_size * 1.14)
 
-    return transforms.Compose([
-        transforms.Resize(resize_size),
-        transforms.CenterCrop(input_size),
-        transforms.ToTensor(),
-        transforms.Normalize(
-            mean=[0.485, 0.456, 0.406],
-            std=[0.229, 0.224, 0.225]
-        )
-    ])
+    return transforms.Compose(
+        [
+            transforms.Resize(resize_size),
+            transforms.CenterCrop(input_size),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ]
+    )
 
 
 def create_dataloaders(options):
@@ -121,40 +122,42 @@ def create_dataloaders(options):
     Returns:
         tuple: (train_loader, val_loader, test_loader)
     """
-    data_path = Path(options['data']['path'])
-    batch_size = options['data']['batch_size']
-    num_workers = options['data'].get('num_workers', 4)
+    data_path = Path(options["data"]["path"])
+    batch_size = options["data"]["batch_size"]
+    num_workers = options["data"].get("num_workers", 4)
 
     train_transform = build_train_transforms(options)
     eval_transform = build_eval_transforms(options)
 
-    train_dataset = datasets.ImageFolder(data_path / 'train', train_transform)
-    val_dataset = datasets.ImageFolder(data_path / 'val', eval_transform)
-    test_dataset = datasets.ImageFolder(data_path / 'test', eval_transform)
+    train_dataset = datasets.ImageFolder(data_path / "train", train_transform)
+    val_dataset = datasets.ImageFolder(data_path / "validate", eval_transform)
+    test_dataset = datasets.ImageFolder(data_path / "test", eval_transform)
 
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
         num_workers=num_workers,
-        pin_memory=True
+        pin_memory=True,
     )
     val_loader = DataLoader(
         val_dataset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=True
+        pin_memory=True,
     )
     test_loader = DataLoader(
         test_dataset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=True
+        pin_memory=True,
     )
 
-    print(f"[Data] Train: {len(train_dataset)}, Val: {len(val_dataset)}, Test: {len(test_dataset)}")
+    print(
+        f"[Data] Train: {len(train_dataset)}, Val: {len(val_dataset)}, Test: {len(test_dataset)}"
+    )
 
     return train_loader, val_loader, test_loader
 
@@ -163,20 +166,21 @@ def create_dataloaders(options):
 # Optimizer and Scheduler
 # ---------------------------------------------------------------------------
 
+
 def create_optimizer(model, options):
     """Create optimizer from config."""
-    train_opts = options['training']
-    lr = train_opts['learning_rate']
-    weight_decay = train_opts.get('weight_decay', 0.01)
-    optimizer_name = train_opts.get('optimizer', 'adamw').lower()
+    train_opts = options["training"]
+    lr = train_opts["learning_rate"]
+    weight_decay = train_opts.get("weight_decay", 0.01)
+    optimizer_name = train_opts.get("optimizer", "adamw").lower()
 
     params = filter(lambda p: p.requires_grad, model.parameters())
 
-    if optimizer_name == 'adamw':
+    if optimizer_name == "adamw":
         return torch.optim.AdamW(params, lr=lr, weight_decay=weight_decay)
-    elif optimizer_name == 'adam':
+    elif optimizer_name == "adam":
         return torch.optim.Adam(params, lr=lr, weight_decay=weight_decay)
-    elif optimizer_name == 'sgd':
+    elif optimizer_name == "sgd":
         return torch.optim.SGD(params, lr=lr, momentum=0.9, weight_decay=weight_decay)
     else:
         raise ValueError(f"Unknown optimizer: {optimizer_name}")
@@ -184,17 +188,17 @@ def create_optimizer(model, options):
 
 def create_scheduler(optimizer, options, steps_per_epoch):
     """Create learning rate scheduler from config."""
-    train_opts = options['training']
-    scheduler_name = train_opts.get('scheduler')
-    epochs = train_opts['epochs']
+    train_opts = options["training"]
+    scheduler_name = train_opts.get("scheduler")
+    epochs = train_opts["epochs"]
 
     if scheduler_name is None:
         return None
-    elif scheduler_name == 'cosine':
+    elif scheduler_name == "cosine":
         return torch.optim.lr_scheduler.CosineAnnealingLR(
             optimizer, T_max=epochs * steps_per_epoch
         )
-    elif scheduler_name == 'step':
+    elif scheduler_name == "step":
         return torch.optim.lr_scheduler.StepLR(
             optimizer, step_size=epochs // 3, gamma=0.1
         )
@@ -205,6 +209,7 @@ def create_scheduler(optimizer, options, steps_per_epoch):
 # ---------------------------------------------------------------------------
 # Metrics Computation
 # ---------------------------------------------------------------------------
+
 
 def compute_accuracy(outputs, targets, topk=(1, 3)):
     """
@@ -237,6 +242,7 @@ def compute_accuracy(outputs, targets, topk=(1, 3)):
 # Training and Evaluation Loops
 # ---------------------------------------------------------------------------
 
+
 def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, device):
     """
     Train for one epoch with mixed precision.
@@ -252,7 +258,7 @@ def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, devi
 
         optimizer.zero_grad()
 
-        with autocast():
+        with autocast("cuda"):
             outputs = model(inputs)
             loss = criterion(outputs, targets)
 
@@ -285,7 +291,7 @@ def evaluate(model, loader, criterion, device):
         for inputs, targets in loader:
             inputs, targets = inputs.to(device), targets.to(device)
 
-            with autocast():
+            with autocast("cuda"):
                 outputs = model(inputs)
                 loss = criterion(outputs, targets)
 
@@ -297,15 +303,16 @@ def evaluate(model, loader, criterion, device):
             num_batches += 1
 
     return {
-        'loss': total_loss / num_batches,
-        'acc_top1': total_top1 / num_batches,
-        'acc_top3': total_top3 / num_batches
+        "loss": total_loss / num_batches,
+        "acc_top1": total_top1 / num_batches,
+        "acc_top3": total_top3 / num_batches,
     }
 
 
 # ---------------------------------------------------------------------------
 # Inference Time Measurement
 # ---------------------------------------------------------------------------
+
 
 def measure_inference_time(model, input_size, device, iterations=100):
     """
@@ -321,7 +328,7 @@ def measure_inference_time(model, input_size, device, iterations=100):
         for _ in range(10):
             _ = model(dummy_input)
 
-    if device.type == 'cuda':
+    if device.type == "cuda":
         torch.cuda.synchronize()
 
     # Measure
@@ -330,7 +337,7 @@ def measure_inference_time(model, input_size, device, iterations=100):
         for _ in range(iterations):
             _ = model(dummy_input)
 
-    if device.type == 'cuda':
+    if device.type == "cuda":
         torch.cuda.synchronize()
 
     elapsed = time.perf_counter() - start
@@ -341,50 +348,55 @@ def measure_inference_time(model, input_size, device, iterations=100):
 # Results Management
 # ---------------------------------------------------------------------------
 
+
 def create_results_dir(experiment_name):
     """Create and return the results directory path."""
-    results_dir = Path('results') / experiment_name
+    results_dir = Path("results") / experiment_name
     results_dir.mkdir(parents=True, exist_ok=True)
     return results_dir
 
 
 def save_config(options, results_dir):
     """Save a copy of the config to the results directory."""
-    config_path = results_dir / 'config.json'
-    with open(config_path, 'w') as f:
+    config_path = results_dir / "config.json"
+    with open(config_path, "w") as f:
         json.dump(options, f, indent=2)
 
 
 def init_metrics_file(results_dir):
     """Initialize the metrics CSV file with headers."""
-    metrics_path = results_dir / 'metrics.csv'
-    with open(metrics_path, 'w', newline='') as f:
+    metrics_path = results_dir / "metrics.csv"
+    with open(metrics_path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(['epoch', 'train_loss', 'val_loss', 'val_acc_top1', 'val_acc_top3', 'lr'])
+        writer.writerow(
+            ["epoch", "train_loss", "val_loss", "val_acc_top1", "val_acc_top3", "lr"]
+        )
     return metrics_path
 
 
 def append_metrics(metrics_path, epoch, train_loss, val_metrics, lr):
     """Append one row of metrics to the CSV file."""
-    with open(metrics_path, 'a', newline='') as f:
+    with open(metrics_path, "a", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow([
-            epoch,
-            f"{train_loss:.4f}",
-            f"{val_metrics['loss']:.4f}",
-            f"{val_metrics['acc_top1']:.4f}",
-            f"{val_metrics['acc_top3']:.4f}",
-            f"{lr:.6f}"
-        ])
+        writer.writerow(
+            [
+                epoch,
+                f"{train_loss:.4f}",
+                f"{val_metrics['loss']:.4f}",
+                f"{val_metrics['acc_top1']:.4f}",
+                f"{val_metrics['acc_top3']:.4f}",
+                f"{lr:.6f}",
+            ]
+        )
 
 
-def save_checkpoint(model, results_dir, filename='best_model.pth'):
+def save_checkpoint(model, results_dir, filename="best_model.pth"):
     """Save model weights to the results directory."""
     checkpoint_path = results_dir / filename
     torch.save(model.state_dict(), checkpoint_path)
 
 
-def load_checkpoint(model, results_dir, filename='best_model.pth'):
+def load_checkpoint(model, results_dir, filename="best_model.pth"):
     """Load model weights from the results directory."""
     checkpoint_path = results_dir / filename
     model.load_state_dict(torch.load(checkpoint_path, weights_only=True))
@@ -393,6 +405,7 @@ def load_checkpoint(model, results_dir, filename='best_model.pth'):
 # ---------------------------------------------------------------------------
 # Early Stopping
 # ---------------------------------------------------------------------------
+
 
 class EarlyStopping:
     """
@@ -437,6 +450,7 @@ class EarlyStopping:
 # Console Output
 # ---------------------------------------------------------------------------
 
+
 def print_epoch_summary(epoch, epochs, train_loss, val_metrics, lr, is_best):
     """Print a formatted epoch summary line."""
     best_marker = " *" if is_best else ""
@@ -470,6 +484,7 @@ def print_final_results(results):
 # Main Training Function
 # ---------------------------------------------------------------------------
 
+
 def train_model(options):
     """
     Run a complete training experiment.
@@ -483,10 +498,10 @@ def train_model(options):
     Returns:
         dict: Summary of results including accuracies and timing
     """
-    experiment_name = options['experiment_name']
-    epochs = options['training']['epochs']
-    seed = options['training'].get('seed', 42)
-    patience = options['training'].get('early_stopping_patience', 20)
+    experiment_name = options["experiment_name"]
+    epochs = options["training"]["epochs"]
+    seed = options["training"].get("seed", 42)
+    patience = options["training"].get("early_stopping_patience", 20)
 
     print(f"\n{'=' * 60}")
     print(f"Starting Experiment: {experiment_name}")
@@ -494,7 +509,7 @@ def train_model(options):
 
     # Setup
     set_seed(seed)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[Device] {device}")
 
     # Results directory
@@ -513,7 +528,7 @@ def train_model(options):
     criterion = nn.CrossEntropyLoss()
     optimizer = create_optimizer(model, options)
     scheduler = create_scheduler(optimizer, options, len(train_loader))
-    scaler = GradScaler()
+    scaler = GradScaler("cuda")
 
     # Early stopping
     early_stopping = EarlyStopping(patience=patience)
@@ -531,12 +546,12 @@ def train_model(options):
 
         val_metrics = evaluate(model, val_loader, criterion, device)
 
-        current_lr = optimizer.param_groups[0]['lr']
-        is_best = early_stopping.step(val_metrics['acc_top1'])
+        current_lr = optimizer.param_groups[0]["lr"]
+        is_best = early_stopping.step(val_metrics["acc_top1"])
 
         if is_best:
-            best_val_acc_top1 = val_metrics['acc_top1']
-            best_val_acc_top3 = val_metrics['acc_top3']
+            best_val_acc_top1 = val_metrics["acc_top1"]
+            best_val_acc_top3 = val_metrics["acc_top3"]
             best_epoch = epoch
             save_checkpoint(model, results_dir)
 
@@ -552,29 +567,29 @@ def train_model(options):
     test_metrics = evaluate(model, test_loader, criterion, device)
 
     # Measure inference time
-    input_size = options['data']['input_size']
+    input_size = options["data"]["input_size"]
     inference_time = measure_inference_time(model, input_size, device)
 
     # Compile results
     total_params, trainable_params = count_parameters(model)
 
     results = {
-        'experiment_name': experiment_name,
-        'best_val_acc_top1': best_val_acc_top1,
-        'best_val_acc_top3': best_val_acc_top3,
-        'best_epoch': best_epoch,
-        'final_test_acc_top1': test_metrics['acc_top1'],
-        'final_test_acc_top3': test_metrics['acc_top3'],
-        'inference_time_ms': inference_time,
-        'total_params': total_params,
-        'trainable_params': trainable_params
+        "experiment_name": experiment_name,
+        "best_val_acc_top1": best_val_acc_top1,
+        "best_val_acc_top3": best_val_acc_top3,
+        "best_epoch": best_epoch,
+        "final_test_acc_top1": test_metrics["acc_top1"],
+        "final_test_acc_top3": test_metrics["acc_top3"],
+        "inference_time_ms": inference_time,
+        "total_params": total_params,
+        "trainable_params": trainable_params,
     }
 
     print_final_results(results)
 
     # Save results summary
-    results_path = results_dir / 'results.json'
-    with open(results_path, 'w') as f:
+    results_path = results_dir / "results.json"
+    with open(results_path, "w") as f:
         json.dump(results, f, indent=2)
 
     return results
