@@ -61,12 +61,13 @@ def get_results_dir():
     return Path("results")
 
 
-def load_metrics(experiment_name):
+def load_metrics(experiment_name, results_dir=None):
     """
     Load training metrics from a completed experiment.
 
     Args:
         experiment_name: Name of the experiment directory
+        results_dir: Optional explicit path to results directory
 
     Returns:
         pd.DataFrame: Metrics with columns [epoch, train_loss, val_loss,
@@ -75,7 +76,11 @@ def load_metrics(experiment_name):
     Raises:
         FileNotFoundError: If metrics.csv doesn't exist
     """
-    metrics_path = get_results_dir() / experiment_name / "metrics.csv"
+    if results_dir is None:
+        results_dir = get_results_dir() / experiment_name
+    else:
+        results_dir = Path(results_dir)
+    metrics_path = results_dir / "metrics.csv"
     if not metrics_path.exists():
         raise FileNotFoundError(f"No metrics found at {metrics_path}")
     metrics = pd.read_csv(metrics_path)
@@ -85,12 +90,13 @@ def load_metrics(experiment_name):
     return metrics
 
 
-def load_results(experiment_name):
+def load_results(experiment_name, results_dir=None):
     """
     Load final results from a completed experiment.
 
     Args:
         experiment_name: Name of the experiment directory
+        results_dir: Optional explicit path to results directory
 
     Returns:
         dict: Results including test accuracy, inference time, etc.
@@ -98,7 +104,11 @@ def load_results(experiment_name):
     Raises:
         FileNotFoundError: If results.json doesn't exist
     """
-    results_path = get_results_dir() / experiment_name / "results.json"
+    if results_dir is None:
+        results_dir = get_results_dir() / experiment_name
+    else:
+        results_dir = Path(results_dir)
+    results_path = results_dir / "results.json"
     if not results_path.exists():
         raise FileNotFoundError(f"No results found at {results_path}")
     with open(results_path) as f:
@@ -129,7 +139,7 @@ def discover_experiments():
 # ---------------------------------------------------------------------------
 
 
-def plot_loss_curves(experiment_name, save=True, show=False):
+def plot_loss_curves(experiment_name, save=True, show=False, results_dir=None):
     """
     Plot training and validation loss curves over epochs.
 
@@ -137,11 +147,17 @@ def plot_loss_curves(experiment_name, save=True, show=False):
         experiment_name: Name of the experiment
         save: Whether to save the figure to disk
         show: Whether to display the figure
+        results_dir: Optional explicit path to results directory
 
     Returns:
         matplotlib.figure.Figure: The generated figure
     """
-    metrics = load_metrics(experiment_name)
+    if results_dir is None:
+        results_dir = get_results_dir() / experiment_name
+    else:
+        results_dir = Path(results_dir)
+
+    metrics = load_metrics(experiment_name, results_dir=results_dir)
 
     with plt.rc_context(PLOT_STYLE):
         fig, ax = plt.subplots(figsize=(8, 5))
@@ -159,7 +175,7 @@ def plot_loss_curves(experiment_name, save=True, show=False):
         plt.tight_layout()
 
         if save:
-            save_path = get_results_dir() / experiment_name / "loss_curves.png"
+            save_path = results_dir / "loss_curves.png"
             fig.savefig(save_path)
             print(f"Saved: {save_path}")
 
@@ -171,7 +187,7 @@ def plot_loss_curves(experiment_name, save=True, show=False):
     return fig
 
 
-def plot_accuracy_curves(experiment_name, save=True, show=False):
+def plot_accuracy_curves(experiment_name, save=True, show=False, results_dir=None):
     """
     Plot validation accuracy over epochs.
 
@@ -179,11 +195,17 @@ def plot_accuracy_curves(experiment_name, save=True, show=False):
         experiment_name: Name of the experiment
         save: Whether to save the figure to disk
         show: Whether to display the figure
+        results_dir: Optional explicit path to results directory
 
     Returns:
         matplotlib.figure.Figure: The generated figure
     """
-    metrics = load_metrics(experiment_name)
+    if results_dir is None:
+        results_dir = get_results_dir() / experiment_name
+    else:
+        results_dir = Path(results_dir)
+
+    metrics = load_metrics(experiment_name, results_dir=results_dir)
 
     with plt.rc_context(PLOT_STYLE):
         fig, ax = plt.subplots(figsize=(8, 5))
@@ -200,7 +222,7 @@ def plot_accuracy_curves(experiment_name, save=True, show=False):
         plt.tight_layout()
 
         if save:
-            save_path = get_results_dir() / experiment_name / "accuracy_curves.png"
+            save_path = results_dir / "accuracy_curves.png"
             fig.savefig(save_path)
             print(f"Saved: {save_path}")
 
@@ -212,7 +234,7 @@ def plot_accuracy_curves(experiment_name, save=True, show=False):
     return fig
 
 
-def plot_learning_rate(experiment_name, save=True, show=False):
+def plot_learning_rate(experiment_name, save=True, show=False, results_dir=None):
     """
     Plot learning rate schedule over epochs.
 
@@ -220,11 +242,17 @@ def plot_learning_rate(experiment_name, save=True, show=False):
         experiment_name: Name of the experiment
         save: Whether to save the figure to disk
         show: Whether to display the figure
+        results_dir: Optional explicit path to results directory
 
     Returns:
         matplotlib.figure.Figure: The generated figure
     """
-    metrics = load_metrics(experiment_name)
+    if results_dir is None:
+        results_dir = get_results_dir() / experiment_name
+    else:
+        results_dir = Path(results_dir)
+
+    metrics = load_metrics(experiment_name, results_dir=results_dir)
 
     with plt.rc_context(PLOT_STYLE):
         fig, ax = plt.subplots(figsize=(8, 5))
@@ -240,7 +268,7 @@ def plot_learning_rate(experiment_name, save=True, show=False):
         plt.tight_layout()
 
         if save:
-            save_path = get_results_dir() / experiment_name / "learning_rate.png"
+            save_path = results_dir / "learning_rate.png"
             fig.savefig(save_path)
             print(f"Saved: {save_path}")
 
@@ -319,7 +347,7 @@ def plot_confusion_matrix(all_targets, all_predictions, class_names,
     return fig
 
 
-def plot_experiment_summary(experiment_name, save=True, show=False):
+def plot_experiment_summary(experiment_name, save=True, show=False, results_dir=None):
     """
     Generate a 2x2 grid summarizing all training metrics.
 
@@ -329,14 +357,20 @@ def plot_experiment_summary(experiment_name, save=True, show=False):
         experiment_name: Name of the experiment
         save: Whether to save the figure to disk
         show: Whether to display the figure
+        results_dir: Optional explicit path to results directory
 
     Returns:
         matplotlib.figure.Figure: The generated figure
     """
-    metrics = load_metrics(experiment_name)
+    if results_dir is None:
+        results_dir = get_results_dir() / experiment_name
+    else:
+        results_dir = Path(results_dir)
+
+    metrics = load_metrics(experiment_name, results_dir=results_dir)
 
     try:
-        results = load_results(experiment_name)
+        results = load_results(experiment_name, results_dir=results_dir)
         has_results = True
     except FileNotFoundError:
         has_results = False
@@ -415,7 +449,7 @@ def plot_experiment_summary(experiment_name, save=True, show=False):
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
         if save:
-            save_path = get_results_dir() / experiment_name / "summary.png"
+            save_path = results_dir / "summary.png"
             fig.savefig(save_path)
             print(f"Saved: {save_path}")
 

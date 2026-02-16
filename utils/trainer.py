@@ -716,10 +716,10 @@ def train_model(options, trial=None, results_dir_override=None):
     # Generate visualizations
     print("\n[Visualization] Generating training plots...")
     try:
-        plot_loss_curves(experiment_name, save=True, show=False)
-        plot_accuracy_curves(experiment_name, save=True, show=False)
-        plot_learning_rate(experiment_name, save=True, show=False)
-        plot_experiment_summary(experiment_name, save=True, show=False)
+        plot_loss_curves(experiment_name, save=True, show=False, results_dir=results_dir)
+        plot_accuracy_curves(experiment_name, save=True, show=False, results_dir=results_dir)
+        plot_learning_rate(experiment_name, save=True, show=False, results_dir=results_dir)
+        plot_experiment_summary(experiment_name, save=True, show=False, results_dir=results_dir)
 
         # Confusion matrix on test set
         all_targets, all_predictions = evaluate_with_predictions(
