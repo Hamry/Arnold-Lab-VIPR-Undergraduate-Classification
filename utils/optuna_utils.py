@@ -163,8 +163,18 @@ def create_pruner(optuna_config: dict) -> optuna.pruners.BasePruner:
     """
     Create Optuna pruner from config.
 
-    Uses MedianPruner by default, which prunes trials performing
-    below the median of completed trials.
+    Uses PercentilePruner (default bottom 25%) so that only the worst-performing
+    trials are pruned.  For dynamic-unfreeze runs, pruning checkpoints fire right
+    before each backbone block is thawed (step = unfreeze event index), making
+    cross-trial comparisons at each step more meaningful than epoch-by-epoch
+    comparisons.  For non-dynamic runs, pruning checkpoints fire every epoch as
+    before.
+
+    Config keys (all optional):
+        percentile        – prune if in bottom N% (default 25.0)
+        n_startup_trials  – trials to run before pruning starts (default 5)
+        n_warmup_steps    – reported steps to skip before pruning each trial (default 0)
+        interval_steps    – check every N steps (default 1)
 
     Args:
         optuna_config: Optuna configuration dictionary
@@ -177,9 +187,10 @@ def create_pruner(optuna_config: dict) -> optuna.pruners.BasePruner:
     if not pruning.get("enabled", True):
         return optuna.pruners.NopPruner()
 
-    return optuna.pruners.MedianPruner(
+    return optuna.pruners.PercentilePruner(
+        percentile=pruning.get("percentile", 25.0),
         n_startup_trials=pruning.get("n_startup_trials", 5),
-        n_warmup_steps=pruning.get("n_warmup_steps", 5),
+        n_warmup_steps=pruning.get("n_warmup_steps", 0),
         interval_steps=pruning.get("interval_steps", 1),
     )
 

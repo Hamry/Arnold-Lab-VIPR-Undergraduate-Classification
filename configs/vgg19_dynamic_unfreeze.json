@@ -1,16 +1,16 @@
 {
-    "experiment_name": "densenet201_frozen",
+    "experiment_name": "vgg19_dynamic_unfreeze",
     "model": {
-        "backbone": "densenet201",
+        "backbone": "vgg19",
         "pretrained": true,
         "freeze_backbone": true,
         "classifier_hidden": [1024],
-        "dropout": 0.2
+        "dropout": 0.3
     },
     "data": {
         "path": "/scratch/hl98745/category_balanced_dataset",
         "input_size": 224,
-        "batch_size": 32,
+        "batch_size": 64,
         "num_workers": 8
     },
     "augmentations": {
@@ -21,12 +21,17 @@
         "random_crop_scale": [0.8, 1.0]
     },
     "training": {
-        "epochs": 50,
-        "learning_rate": 0.0001,
+        "epochs": 100,
+        "learning_rate": 0.001,
         "optimizer": "adamw",
         "weight_decay": 0.01,
         "scheduler": "cosine",
         "seed": 42,
-        "early_stopping_patience": 20
+        "early_stopping_patience": 20,
+        "dynamic_unfreeze": {
+            "unfreeze_patience": 8,
+            "unfreeze_size": 1,
+            "lr_decay_ratio": 0.1
+        }
     }
 }

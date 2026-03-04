@@ -8,7 +8,7 @@ from .model_utils import (
     load_model,
     count_parameters,
     BACKBONE_REGISTRY,
-    get_resolution_probe,
+    BACKBONE_UNFREEZE_BLOCKS,
     get_unfreeze_units,
     thaw_units,
     UnfreezeUnit,

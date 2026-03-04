@@ -53,8 +53,8 @@ def set_seed(seed):
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
+        torch.backends.cudnn.deterministic = False
+        torch.backends.cudnn.benchmark = True
 
 
 # ---------------------------------------------------------------------------
@@ -159,6 +159,8 @@ def create_dataloaders(options):
         shuffle=True,
         num_workers=num_workers,
         pin_memory=True,
+        persistent_workers=True,
+        prefetch_factor=4,
     )
     val_loader = DataLoader(
         val_dataset,
@@ -166,6 +168,8 @@ def create_dataloaders(options):
         shuffle=False,
         num_workers=num_workers,
         pin_memory=True,
+        persistent_workers=True,
+        prefetch_factor=4,
     )
     test_loader = DataLoader(
         test_dataset,
@@ -173,6 +177,8 @@ def create_dataloaders(options):
         shuffle=False,
         num_workers=num_workers,
         pin_memory=True,
+        persistent_workers=True,
+        prefetch_factor=4,
     )
 
     print(
@@ -879,9 +885,8 @@ def train_model(options, trial=None, results_dir_override=None):
     # Dynamic unfreezing controller (plateau-triggered)
     thaw_controller = None
     if dynamic_unfreeze_opts:
-        input_shape = (3, options["data"]["input_size"], options["data"]["input_size"])
-        unfreeze_units = get_unfreeze_units(model, backbone_name, input_shape)
-        print(f"[Dynamic Unfreeze] Detected {len(unfreeze_units)} backbone unit(s).")
+        unfreeze_units = get_unfreeze_units(model, backbone_name)
+        print(f"[Dynamic Unfreeze] {len(unfreeze_units)} backbone block(s) available.")
         thaw_controller = DynamicThawController(
             units=unfreeze_units,
             unfreeze_patience=dynamic_unfreeze_opts["unfreeze_patience"],
@@ -897,6 +902,7 @@ def train_model(options, trial=None, results_dir_override=None):
     # Training state
     best_val_acc_top1 = 0.0
     best_epoch = 0
+    unfreeze_event_count = 0  # Tracks dynamic unfreeze events; used as Optuna pruning step
 
     # Training loop
     for epoch in range(1, epochs + 1):
@@ -929,6 +935,15 @@ def train_model(options, trial=None, results_dir_override=None):
         if thaw_controller is not None:
             result = thaw_controller.step(val_metrics["loss"])
             if result is not None:
+                # Optuna pruning checkpoint: evaluate right before unfreezing.
+                # Step = unfreeze event index so comparisons across trials are apples-to-apples.
+                # Negate val_loss because the study direction is "maximize".
+                if trial is not None:
+                    import optuna
+                    trial.report(-val_metrics["loss"], unfreeze_event_count)
+                    if trial.should_prune():
+                        raise optuna.TrialPruned()
+
                 units_batch, unit_lr = result
                 thaw_units(model, units_batch)
                 new_params = [
@@ -948,9 +963,11 @@ def train_model(options, trial=None, results_dir_override=None):
                     f"\n[Epoch {epoch}] Dynamic unfreeze: {len(units_batch)} unit(s) "
                     f"@ lr={unit_lr:.2e} | Trainable: {trainable:,}/{total:,}\n"
                 )
+                unfreeze_event_count += 1
 
-        # Optuna pruning check
-        if trial is not None:
+        # Epoch-based Optuna pruning (non-dynamic mode only).
+        # Dynamic mode uses unfreeze-event pruning above.
+        if trial is not None and thaw_controller is None:
             trial.report(val_metrics["acc_top1"], epoch)
             if trial.should_prune():
                 import optuna
