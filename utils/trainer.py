@@ -55,7 +55,7 @@ def set_seed(seed):
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
         torch.backends.cudnn.deterministic = False
-        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.benchmark = False
 
 
 # ---------------------------------------------------------------------------
@@ -160,8 +160,8 @@ def create_dataloaders(options):
         shuffle=True,
         num_workers=num_workers,
         pin_memory=True,
-        persistent_workers=True,
-        prefetch_factor=4,
+        persistent_workers=False,
+        prefetch_factor=2,
     )
     val_loader = DataLoader(
         val_dataset,
@@ -169,8 +169,8 @@ def create_dataloaders(options):
         shuffle=False,
         num_workers=num_workers,
         pin_memory=True,
-        persistent_workers=True,
-        prefetch_factor=4,
+        persistent_workers=False,
+        prefetch_factor=2,
     )
     test_loader = DataLoader(
         test_dataset,
@@ -178,8 +178,8 @@ def create_dataloaders(options):
         shuffle=False,
         num_workers=num_workers,
         pin_memory=True,
-        persistent_workers=True,
-        prefetch_factor=4,
+        persistent_workers=False,
+        prefetch_factor=2,
     )
 
     print(
