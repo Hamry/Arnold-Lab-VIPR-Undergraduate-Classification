@@ -5,6 +5,7 @@ Stateless training function that takes a config, runs an experiment,
 and saves results. Supports mixed precision and early stopping.
 """
 
+import gc
 import os
 import json
 import time
@@ -1020,6 +1021,14 @@ def train_model(options, trial=None, results_dir_override=None):
     results_path = results_dir / "results.json"
     with open(results_path, "w") as f:
         json.dump(results, f, indent=2)
+
+    # Explicitly shut down DataLoader workers before returning.
+    # With persistent_workers=True and pin_memory=True, workers and the
+    # pin_memory_thread can deadlock during GC at trial boundaries unless
+    # the loaders are deleted here while the CUDA context is still alive.
+    del train_loader, val_loader, test_loader
+    gc.collect()
+    torch.cuda.empty_cache()
 
     # Generate visualizations
     print("\n[Visualization] Generating training plots...")
