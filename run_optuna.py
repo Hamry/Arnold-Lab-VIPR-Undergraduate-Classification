@@ -27,6 +27,7 @@ from utils.optuna_utils import (
     apply_hyperparameters,
     create_pruner,
     cleanup_pruned_trial,
+    cleanup_trials,
     TrialCleanupCallback,
     BestModelCallback,
     StudySummaryCallback,
@@ -298,6 +299,10 @@ def run_optimization(optuna_config: dict, resume: bool = False):
         callbacks=callbacks,
         gc_after_trial=True,  # Help with memory management
     )
+
+    # Final cleanup to ensure only top-N trials remain after optimization ends
+    print("[Optuna] Running final cleanup...")
+    cleanup_trials(study_dir, study, keep_top_n=cleanup_config.get("keep_top_n", 5))
 
     # Print final summary
     print_study_summary(study, study_dir)

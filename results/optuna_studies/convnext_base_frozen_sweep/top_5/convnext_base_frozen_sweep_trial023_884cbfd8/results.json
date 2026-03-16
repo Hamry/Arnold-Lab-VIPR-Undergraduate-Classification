@@ -1,0 +1,24 @@
+{
+  "experiment_name": "convnext_base_frozen_sweep_trial023_884cbfd8",
+  "best_val_acc_top1": 0.8859489051094891,
+  "best_epoch": 38,
+  "final_test_acc_top1": 0.9113924050632911,
+  "final_test_f1": 0.9066286134080888,
+  "final_test_precision": 0.9058921626668023,
+  "final_test_recall": 0.9074098218608669,
+  "inference_time_ms": 7.09081263281405,
+  "total_params": 88093316,
+  "trainable_params": 528900,
+  "per_class_test_f1": {
+    "blurry": 0.8684210526315789,
+    "good": 0.9257425742574258,
+    "opaque": 0.8785046728971962,
+    "yellow": 0.9538461538461539
+  },
+  "per_class_test_acc": {
+    "blurry": 0.8761061946902655,
+    "good": 0.9211822660098522,
+    "opaque": 0.8785046728971962,
+    "yellow": 0.9538461538461539
+  }
+}

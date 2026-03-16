@@ -1,0 +1,11 @@
+{
+  "experiment_name": "swin_t_frozen",
+  "best_val_acc_top1": 0.8375,
+  "best_val_acc_top3": 0.9973214285714286,
+  "best_epoch": 40,
+  "final_test_acc_top1": 0.8680555555555556,
+  "final_test_acc_top3": 1.0,
+  "inference_time_ms": 8.12789548188448,
+  "total_params": 28310910,
+  "trainable_params": 791556
+}

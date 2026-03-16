@@ -1,0 +1,43 @@
+{
+  "experiment_name": "resnet152_gradual_unfreeze_sweep_trial026_5d471311",
+  "model": {
+    "backbone": "resnet152",
+    "pretrained": true,
+    "freeze_backbone": true,
+    "classifier_hidden": [
+      2048,
+      1024
+    ],
+    "dropout": 0.323968521025156
+  },
+  "data": {
+    "path": "/scratch/hl98745/data/final_split_dataset",
+    "input_size": 224,
+    "batch_size": 32,
+    "num_workers": 8
+  },
+  "augmentations": {
+    "horizontal_flip": true,
+    "vertical_flip": false,
+    "random_rotation": 1.7626066741536133,
+    "color_jitter": 0.07782546442713334,
+    "random_crop_scale": [
+      0.8,
+      1.0
+    ]
+  },
+  "training": {
+    "epochs": 100,
+    "learning_rate": 0.0006097822481799821,
+    "optimizer": "adamw",
+    "weight_decay": 3.1524747375881714e-05,
+    "scheduler": "cosine",
+    "seed": 42,
+    "early_stopping_patience": 20,
+    "dynamic_unfreeze": {
+      "unfreeze_patience": 11,
+      "unfreeze_size": 1,
+      "lr_decay_ratio": 0.19860818629234767
+    }
+  }
+}

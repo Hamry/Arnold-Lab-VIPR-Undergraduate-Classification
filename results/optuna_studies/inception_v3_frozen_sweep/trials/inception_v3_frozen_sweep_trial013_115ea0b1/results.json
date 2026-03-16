@@ -1,0 +1,24 @@
+{
+  "experiment_name": "inception_v3_frozen_sweep_trial013_115ea0b1",
+  "best_val_acc_top1": 0.7965328467153284,
+  "best_epoch": 40,
+  "final_test_acc_top1": 0.8245931283905967,
+  "final_test_f1": 0.8086112125441103,
+  "final_test_precision": 0.8161569032626868,
+  "final_test_recall": 0.8033217525403934,
+  "inference_time_ms": 8.593689613044262,
+  "total_params": 27214540,
+  "trainable_params": 2102276,
+  "per_class_test_f1": {
+    "blurry": 0.7741935483870969,
+    "good": 0.886255924170616,
+    "opaque": 0.7450980392156862,
+    "yellow": 0.8288973384030418
+  },
+  "per_class_test_acc": {
+    "blurry": 0.7433628318584071,
+    "good": 0.9211822660098522,
+    "opaque": 0.7102803738317757,
+    "yellow": 0.8384615384615385
+  }
+}

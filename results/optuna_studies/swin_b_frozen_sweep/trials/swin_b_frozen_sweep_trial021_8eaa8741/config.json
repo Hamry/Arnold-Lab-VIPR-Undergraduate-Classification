@@ -1,0 +1,38 @@
+{
+  "experiment_name": "swin_b_frozen_sweep_trial021_8eaa8741",
+  "model": {
+    "backbone": "swin_b",
+    "pretrained": true,
+    "freeze_backbone": true,
+    "classifier_hidden": [
+      1024,
+      512
+    ],
+    "dropout": 0.3323280889925701
+  },
+  "data": {
+    "path": "/scratch/hl98745/data/final_split_dataset",
+    "input_size": 224,
+    "batch_size": 32,
+    "num_workers": 8
+  },
+  "augmentations": {
+    "horizontal_flip": true,
+    "vertical_flip": false,
+    "random_rotation": 2.1708948442266687,
+    "color_jitter": 0.06644121909607616,
+    "random_crop_scale": [
+      0.8,
+      1.0
+    ]
+  },
+  "training": {
+    "epochs": 50,
+    "learning_rate": 0.00030287375149320225,
+    "optimizer": "adamw",
+    "weight_decay": 0.006965507613227617,
+    "scheduler": "cosine",
+    "seed": 42,
+    "early_stopping_patience": 20
+  }
+}

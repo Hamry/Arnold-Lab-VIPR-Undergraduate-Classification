@@ -1,0 +1,48 @@
+{
+  "study_name": "densenet201_frozen_sweep",
+  "updated_at": "2026-02-23T18:19:04.048409",
+  "n_trials_completed": 25,
+  "n_trials_pruned": 0,
+  "n_trials_failed": 0,
+  "n_trials_total": 25,
+  "best_trial": {
+    "number": 20,
+    "value": 0.8804744525547445,
+    "params": {
+      "training.learning_rate": 0.0008584929324000566,
+      "training.weight_decay": 0.002567995232616285,
+      "augmentations.color_jitter": 0.08593634234547942,
+      "augmentations.random_rotation": 12.097894507086302,
+      "model.classifier_hidden_idx": 3,
+      "model.dropout": 0.15993350656206182
+    },
+    "trial_name": "densenet201_frozen_sweep_trial020_93f466ca"
+  },
+  "top_5_trials": [
+    {
+      "number": 20,
+      "value": 0.8804744525547445,
+      "trial_name": "densenet201_frozen_sweep_trial020_93f466ca"
+    },
+    {
+      "number": 17,
+      "value": 0.8795620437956204,
+      "trial_name": "densenet201_frozen_sweep_trial017_bfd91c21"
+    },
+    {
+      "number": 11,
+      "value": 0.8777372262773723,
+      "trial_name": "densenet201_frozen_sweep_trial011_3d95b57e"
+    },
+    {
+      "number": 12,
+      "value": 0.8777372262773723,
+      "trial_name": "densenet201_frozen_sweep_trial012_7994493e"
+    },
+    {
+      "number": 6,
+      "value": 0.8768248175182481,
+      "trial_name": "densenet201_frozen_sweep_trial006_63d0073e"
+    }
+  ]
+}

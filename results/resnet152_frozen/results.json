@@ -1,0 +1,11 @@
+{
+  "experiment_name": "resnet152_frozen",
+  "best_val_acc_top1": 0.8714285714285714,
+  "best_val_acc_top3": 0.9973214285714286,
+  "best_epoch": 36,
+  "final_test_acc_top1": 0.8722993830839793,
+  "final_test_acc_top3": 0.9965277777777778,
+  "inference_time_ms": 89.37763724476099,
+  "total_params": 60246084,
+  "trainable_params": 2102276
+}

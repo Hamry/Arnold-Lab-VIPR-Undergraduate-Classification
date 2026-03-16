@@ -1,0 +1,37 @@
+{
+  "experiment_name": "inception_v3_frozen_sweep_trial010_8bf3c34c",
+  "model": {
+    "backbone": "inception_v3",
+    "pretrained": true,
+    "freeze_backbone": true,
+    "classifier_hidden": [
+      1024
+    ],
+    "dropout": 0.11463282068850739
+  },
+  "data": {
+    "path": "/scratch/hl98745/data/final_split_dataset",
+    "input_size": 299,
+    "batch_size": 32,
+    "num_workers": 8
+  },
+  "augmentations": {
+    "horizontal_flip": true,
+    "vertical_flip": false,
+    "random_rotation": 0.33492865511439907,
+    "color_jitter": 0.14541477782679846,
+    "random_crop_scale": [
+      0.8,
+      1.0
+    ]
+  },
+  "training": {
+    "epochs": 50,
+    "learning_rate": 0.00010091464711420742,
+    "optimizer": "adamw",
+    "weight_decay": 0.0014795474225820402,
+    "scheduler": "cosine",
+    "seed": 42,
+    "early_stopping_patience": 20
+  }
+}

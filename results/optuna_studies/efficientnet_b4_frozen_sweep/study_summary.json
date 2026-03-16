@@ -1,0 +1,48 @@
+{
+  "study_name": "efficientnet_b4_frozen_sweep",
+  "updated_at": "2026-02-23T20:22:51.031761",
+  "n_trials_completed": 25,
+  "n_trials_pruned": 0,
+  "n_trials_failed": 0,
+  "n_trials_total": 25,
+  "best_trial": {
+    "number": 21,
+    "value": 0.8786496350364964,
+    "params": {
+      "training.learning_rate": 0.00041748428511848533,
+      "training.weight_decay": 2.6151719368924253e-05,
+      "augmentations.color_jitter": 0.08213933935311794,
+      "augmentations.random_rotation": 3.3995483251517173,
+      "model.classifier_hidden_idx": 3,
+      "model.dropout": 0.348746032596081
+    },
+    "trial_name": "efficientnet_b4_frozen_sweep_trial021_6e84ebbc"
+  },
+  "top_5_trials": [
+    {
+      "number": 21,
+      "value": 0.8786496350364964,
+      "trial_name": "efficientnet_b4_frozen_sweep_trial021_6e84ebbc"
+    },
+    {
+      "number": 22,
+      "value": 0.8768248175182481,
+      "trial_name": "efficientnet_b4_frozen_sweep_trial022_2b0258b9"
+    },
+    {
+      "number": 11,
+      "value": 0.8759124087591241,
+      "trial_name": "efficientnet_b4_frozen_sweep_trial011_1059d205"
+    },
+    {
+      "number": 1,
+      "value": 0.875,
+      "trial_name": "efficientnet_b4_frozen_sweep_trial001_933a930e"
+    },
+    {
+      "number": 2,
+      "value": 0.875,
+      "trial_name": "efficientnet_b4_frozen_sweep_trial002_286edc19"
+    }
+  ]
+}

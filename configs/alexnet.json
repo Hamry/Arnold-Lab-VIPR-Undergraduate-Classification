@@ -11,7 +11,7 @@
         "path": "/scratch/vk44347/workDir/data",
         "input_size": 224,
         "batch_size": 32,
-        "num_workers": 4
+        "num_workers": 8
     },
     "augmentations": {
         "horizontal_flip": true,

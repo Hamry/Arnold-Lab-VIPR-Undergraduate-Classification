@@ -11,6 +11,7 @@ import time
 import random
 import csv
 from pathlib import Path
+from typing import List, Optional, Tuple
 
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend for SLURM/headless
@@ -33,6 +34,9 @@ from .model_utils import (
     _get_classifier_attr,
     get_backbone_blocks,
     thaw_backbone_percentage,
+    get_unfreeze_units,
+    thaw_units,
+    UnfreezeUnit,
 )
 from .visualization import (
     plot_loss_curves,
@@ -188,7 +192,7 @@ def create_dataloaders(options):
 # ---------------------------------------------------------------------------
 
 
-def create_optimizer(model, options, backbone_name=None):
+def create_optimizer(model, options, backbone_name=None, dynamic_unfreeze_mode=False):
     """
     Create optimizer from config with optional discriminative learning rates.
 
@@ -197,10 +201,15 @@ def create_optimizer(model, options, backbone_name=None):
     Includes ALL parameters (even frozen ones) to preserve momentum state
     when thawing layers mid-training.
 
+    When dynamic_unfreeze_mode=True, only the classifier params are included
+    at startup. Backbone units are added later via optimizer.add_param_group()
+    as they are unfrozen, giving each unit a fresh optimizer state.
+
     Args:
         model: The model
         options: Config dict
         backbone_name: If provided, enables discriminative LR setup
+        dynamic_unfreeze_mode: If True, start with classifier params only.
 
     Returns:
         torch.optim.Optimizer
@@ -211,8 +220,15 @@ def create_optimizer(model, options, backbone_name=None):
     optimizer_name = train_opts.get("optimizer", "adamw").lower()
     thaw_schedule = train_opts.get("thaw_schedule")
 
-    # Use discriminative LR if thaw_schedule is configured
-    if backbone_name and thaw_schedule:
+    if dynamic_unfreeze_mode and backbone_name:
+        # Classifier-only startup; backbone units added incrementally
+        classifier_attr = _get_classifier_attr(backbone_name)
+        classifier = getattr(model, classifier_attr)
+        param_groups = [
+            {'params': list(classifier.parameters()), 'lr': lr, 'name': 'classifier'},
+        ]
+    elif backbone_name and thaw_schedule:
+        # Use discriminative LR if thaw_schedule is configured
         backbone_lr_ratio = train_opts.get("backbone_lr_ratio", 0.1)
         classifier_attr = _get_classifier_attr(backbone_name)
         classifier = getattr(model, classifier_attr)
@@ -304,6 +320,54 @@ def compute_accuracy(outputs, targets):
     _, pred = outputs.topk(1, dim=1, largest=True, sorted=True)
     correct = pred.eq(targets.view(-1, 1)).sum()
     return (correct / batch_size).item()
+
+
+# ---------------------------------------------------------------------------
+# Per-Class Metric Computation
+# ---------------------------------------------------------------------------
+
+
+def compute_per_class_metrics(targets, predictions, num_classes):
+    """
+    Compute per-class and macro-averaged classification metrics without sklearn.
+
+    Args:
+        targets: list of ground-truth class indices
+        predictions: list of predicted class indices
+        num_classes: total number of classes
+
+    Returns:
+        tuple:
+            per_class_acc  (list[float]) – per-class recall / accuracy
+            per_class_f1   (list[float]) – per-class F1 score
+            per_class_prec (list[float]) – per-class precision
+            per_class_rec  (list[float]) – per-class recall (same as acc)
+            macro_f1       (float)
+            macro_precision(float)
+            macro_recall   (float)
+    """
+    cm = [[0] * num_classes for _ in range(num_classes)]
+    for t, p in zip(targets, predictions):
+        cm[t][p] += 1
+
+    acc_list, f1_list, prec_list, rec_list = [], [], [], []
+    for i in range(num_classes):
+        tp = cm[i][i]
+        fn = sum(cm[i]) - tp
+        fp = sum(cm[r][i] for r in range(num_classes)) - tp
+        acc  = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        prec = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        rec  = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        f1   = 2 * prec * rec / (prec + rec) if (prec + rec) > 0 else 0.0
+        acc_list.append(acc)
+        f1_list.append(f1)
+        prec_list.append(prec)
+        rec_list.append(rec)
+
+    macro_f1   = sum(f1_list)   / num_classes
+    macro_prec = sum(prec_list) / num_classes
+    macro_rec  = sum(rec_list)  / num_classes
+    return acc_list, f1_list, prec_list, rec_list, macro_f1, macro_prec, macro_rec
 
 
 # ---------------------------------------------------------------------------
@@ -404,6 +468,72 @@ def evaluate_with_predictions(model, loader, device):
     return all_targets, all_predictions
 
 
+def evaluate_full(model, loader, criterion, device, class_names):
+    """
+    Evaluate model with full per-class and macro metrics in a single pass.
+
+    Collects all predictions, computes loss and accuracy as usual, then
+    derives per-class accuracy, per-class F1, and macro F1/precision/recall
+    via compute_per_class_metrics.
+
+    Args:
+        model: The model to evaluate
+        loader: DataLoader for evaluation
+        criterion: Loss function
+        device: Device to run on
+        class_names: List of class name strings (from dataset.classes)
+
+    Returns:
+        dict with keys:
+            loss           (float)
+            acc_top1       (float) – overall accuracy
+            per_class_acc  (dict)  – {class_name: float}
+            per_class_f1   (dict)  – {class_name: float}
+            macro_f1       (float)
+            macro_precision(float)
+            macro_recall   (float)
+    """
+    model.eval()
+    total_loss = 0.0
+    all_targets = []
+    all_predictions = []
+    num_batches = 0
+
+    with torch.no_grad():
+        for inputs, targets in loader:
+            inputs, targets = inputs.to(device), targets.to(device)
+
+            with autocast("cuda"):
+                outputs = model(inputs)
+                loss = criterion(outputs, targets)
+
+            _, predicted = outputs.max(1)
+            total_loss += loss.item()
+            num_batches += 1
+            all_targets.extend(targets.cpu().tolist())
+            all_predictions.extend(predicted.cpu().tolist())
+
+    num_classes = len(class_names)
+    overall_acc = sum(t == p for t, p in zip(all_targets, all_predictions)) / len(all_targets)
+
+    acc_list, f1_list, _, _, macro_f1, macro_prec, macro_rec = compute_per_class_metrics(
+        all_targets, all_predictions, num_classes
+    )
+
+    per_class_acc = {class_names[i].lower(): acc_list[i] for i in range(num_classes)}
+    per_class_f1  = {class_names[i].lower(): f1_list[i]  for i in range(num_classes)}
+
+    return {
+        "loss":            total_loss / num_batches,
+        "acc_top1":        overall_acc,
+        "per_class_acc":   per_class_acc,
+        "per_class_f1":    per_class_f1,
+        "macro_f1":        macro_f1,
+        "macro_precision": macro_prec,
+        "macro_recall":    macro_rec,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Inference Time Measurement
 # ---------------------------------------------------------------------------
@@ -458,28 +588,39 @@ def save_config(options, results_dir):
         json.dump(options, f, indent=2)
 
 
-def init_metrics_file(results_dir):
-    """Initialize the metrics CSV file with headers."""
+def init_metrics_file(results_dir, class_names):
+    """Initialize the metrics CSV file with headers.
+
+    Columns: epoch, train_loss, val_loss, val_acc_top1, lr,
+             val_f1_<class> * N, val_acc_<class> * N
+    """
     metrics_path = results_dir / "metrics.csv"
+    headers = ["epoch", "train_loss", "val_loss", "val_acc_top1", "lr"]
+    headers += [f"val_f1_{c.lower()}"  for c in class_names]
+    headers += [f"val_acc_{c.lower()}" for c in class_names]
     with open(metrics_path, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["epoch", "train_loss", "val_loss", "val_acc_top1", "lr"])
+        writer.writerow(headers)
     return metrics_path
 
 
-def append_metrics(metrics_path, epoch, train_loss, val_metrics, lr):
+def append_metrics(metrics_path, epoch, train_loss, val_metrics, lr, class_names):
     """Append one row of metrics to the CSV file."""
+    row = [
+        epoch,
+        f"{train_loss:.4f}",
+        f"{val_metrics['loss']:.4f}",
+        f"{val_metrics['acc_top1']:.4f}",
+        f"{lr:.6f}",
+    ]
+    # Per-class F1 then per-class accuracy, in class_names order
+    for c in class_names:
+        row.append(f"{val_metrics['per_class_f1'][c.lower()]:.4f}")
+    for c in class_names:
+        row.append(f"{val_metrics['per_class_acc'][c.lower()]:.4f}")
     with open(metrics_path, "a", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(
-            [
-                epoch,
-                f"{train_loss:.4f}",
-                f"{val_metrics['loss']:.4f}",
-                f"{val_metrics['acc_top1']:.4f}",
-                f"{lr:.6f}",
-            ]
-        )
+        writer.writerow(row)
 
 
 def save_checkpoint(model, results_dir, filename="best_model.pth"):
@@ -539,6 +680,101 @@ class EarlyStopping:
 
 
 # ---------------------------------------------------------------------------
+# Dynamic Thaw Controller
+# ---------------------------------------------------------------------------
+
+
+class DynamicThawController:
+    """
+    Plateau-triggered progressive unfreezing controller.
+
+    Monitors validation loss after each epoch. When the loss fails to
+    improve for `unfreeze_patience` consecutive epochs, the next batch
+    of UnfreezeUnits (ordered output→input) is returned for thawing.
+
+    Each newly unfrozen batch receives a learning rate of:
+        lr = base_lr * lr_decay_ratio ** depth_level
+
+    where depth_level starts at 1 for the first unfrozen batch and
+    increments with each successive trigger.
+
+    Usage::
+
+        controller = DynamicThawController(units, patience=5, size=1,
+                                           lr_decay_ratio=0.1, base_lr=1e-4)
+        for epoch in ...:
+            result = controller.step(val_loss)
+            if result is not None:
+                units_batch, unit_lr = result
+                thaw_units(model, units_batch)
+                optimizer.add_param_group({'params': ..., 'lr': unit_lr})
+    """
+
+    _MIN_DELTA = 0.001  # minimum loss improvement to reset counter
+
+    def __init__(self, units, unfreeze_patience, unfreeze_size, lr_decay_ratio, base_lr):
+        """
+        Args:
+            units: List[UnfreezeUnit] ordered output→input (from get_unfreeze_units).
+            unfreeze_patience: Epochs without val_loss improvement before triggering.
+            unfreeze_size: Number of units to open per trigger.
+            lr_decay_ratio: LR multiplier per depth level (e.g. 0.1).
+            base_lr: Classifier head learning rate (depth-0 reference).
+        """
+        self._units: List[UnfreezeUnit] = list(units)
+        self._patience = unfreeze_patience
+        self._size = unfreeze_size
+        self._decay = lr_decay_ratio
+        self._base_lr = base_lr
+
+        self._best_loss: Optional[float] = None
+        self._counter = 0
+        self._next_idx = 0
+        self._depth_level = 1  # depth 0 = classifier head; backbone starts at 1
+        self.all_unfrozen = False
+
+    def step(self, val_loss: float) -> Optional[Tuple[List[UnfreezeUnit], float]]:
+        """
+        Update controller state with the latest validation loss.
+
+        Args:
+            val_loss: Current epoch validation loss.
+
+        Returns:
+            (units_batch, lr) if a plateau was detected and units remain,
+            otherwise None.
+        """
+        # Track best loss
+        if self._best_loss is None or val_loss < self._best_loss - self._MIN_DELTA:
+            self._best_loss = val_loss
+            self._counter = 0
+            return None
+
+        self._counter += 1
+
+        if self._counter < self._patience:
+            return None
+
+        # Plateau detected — check if units remain
+        if self._next_idx >= len(self._units):
+            self.all_unfrozen = True
+            return None
+
+        # Grab the next batch of units
+        batch = self._units[self._next_idx: self._next_idx + self._size]
+        unit_lr = self._base_lr * (self._decay ** self._depth_level)
+
+        self._next_idx += len(batch)
+        self._depth_level += 1
+        self._counter = 0  # reset counter after unfreeze
+
+        if self._next_idx >= len(self._units):
+            self.all_unfrozen = True
+
+        return batch, unit_lr
+
+
+# ---------------------------------------------------------------------------
 # Console Output
 # ---------------------------------------------------------------------------
 
@@ -562,7 +798,10 @@ def print_final_results(results):
     print("=" * 60)
     print(f"Best Validation Accuracy: {results['best_val_acc_top1']:.2%}")
     print(f"Best Epoch: {results['best_epoch']}")
-    print(f"Test Accuracy: {results['final_test_acc_top1']:.2%}")
+    print(f"Test Accuracy:  {results['final_test_acc_top1']:.2%}")
+    print(f"Test F1 (macro):        {results['final_test_f1']:.4f}")
+    print(f"Test Precision (macro): {results['final_test_precision']:.4f}")
+    print(f"Test Recall (macro):    {results['final_test_recall']:.4f}")
     print(f"Inference Time: {results['inference_time_ms']:.2f} ms")
     print(f"Total Parameters: {results['total_params']:,}")
     print(f"Trainable Parameters: {results['trainable_params']:,}")
@@ -614,10 +853,15 @@ def train_model(options, trial=None, results_dir_override=None):
     else:
         results_dir = create_results_dir(experiment_name)
     save_config(options, results_dir)
-    metrics_path = init_metrics_file(results_dir)
 
     # Data
     train_loader, val_loader, test_loader = create_dataloaders(options)
+    class_names = getattr(train_loader.dataset, "classes", None)
+    if class_names is None:
+        num_classes = options["model"]["num_classes"]
+        class_names = [f"class{i}" for i in range(num_classes)]
+
+    metrics_path = init_metrics_file(results_dir, class_names)
 
     # Model
     model = load_model(options)
@@ -625,15 +869,33 @@ def train_model(options, trial=None, results_dir_override=None):
     backbone_name = options['model']['backbone']
 
     # Training components
+    dynamic_unfreeze_opts = options["training"].get("dynamic_unfreeze")
     criterion = nn.CrossEntropyLoss()
-    optimizer = create_optimizer(model, options, backbone_name)
+    optimizer = create_optimizer(
+        model, options, backbone_name,
+        dynamic_unfreeze_mode=bool(dynamic_unfreeze_opts)
+    )
     scheduler = create_scheduler(optimizer, options, len(train_loader))
     scaler = GradScaler(enabled = (device.type == "cuda"))
 
     # Early stopping
     early_stopping = EarlyStopping(patience=patience)
 
-    # Progressive unfreezing state
+    # Dynamic unfreezing controller (plateau-triggered)
+    thaw_controller = None
+    if dynamic_unfreeze_opts:
+        input_shape = (3, options["data"]["input_size"], options["data"]["input_size"])
+        unfreeze_units = get_unfreeze_units(model, backbone_name, input_shape)
+        print(f"[Dynamic Unfreeze] Detected {len(unfreeze_units)} backbone unit(s).")
+        thaw_controller = DynamicThawController(
+            units=unfreeze_units,
+            unfreeze_patience=dynamic_unfreeze_opts["unfreeze_patience"],
+            unfreeze_size=dynamic_unfreeze_opts["unfreeze_size"],
+            lr_decay_ratio=dynamic_unfreeze_opts["lr_decay_ratio"],
+            base_lr=options["training"]["learning_rate"],
+        )
+
+    # Progressive unfreezing state (epoch-schedule mode)
     current_thaw_pct = 0.0
     thaw_schedule = options["training"].get("thaw_schedule")
 
@@ -666,7 +928,31 @@ def train_model(options, trial=None, results_dir_override=None):
             model, train_loader, criterion, optimizer, scheduler, scaler, device
         )
 
-        val_metrics = evaluate(model, val_loader, criterion, device)
+        val_metrics = evaluate_full(model, val_loader, criterion, device, class_names)
+
+        # Dynamic plateau-triggered unfreezing
+        if thaw_controller is not None:
+            result = thaw_controller.step(val_metrics["loss"])
+            if result is not None:
+                units_batch, unit_lr = result
+                thaw_units(model, units_batch)
+                new_params = [
+                    p
+                    for unit in units_batch
+                    for name in unit.module_names
+                    for p in model.get_submodule(name).parameters()
+                ]
+                depth = thaw_controller._depth_level - 1  # already incremented in step()
+                optimizer.add_param_group({
+                    'params': new_params,
+                    'lr': unit_lr,
+                    'name': f'backbone_d{depth}',
+                })
+                total, trainable = count_parameters(model)
+                print(
+                    f"\n[Epoch {epoch}] Dynamic unfreeze: {len(units_batch)} unit(s) "
+                    f"@ lr={unit_lr:.2e} | Trainable: {trainable:,}/{total:,}\n"
+                )
 
         # Optuna pruning check
         if trial is not None:
@@ -683,7 +969,7 @@ def train_model(options, trial=None, results_dir_override=None):
             best_epoch = epoch
             save_checkpoint(model, results_dir)
 
-        append_metrics(metrics_path, epoch, train_loss, val_metrics, current_lr)
+        append_metrics(metrics_path, epoch, train_loss, val_metrics, current_lr, class_names)
         print_epoch_summary(epoch, epochs, train_loss, val_metrics, current_lr, is_best)
 
         if early_stopping.should_stop:
@@ -692,7 +978,7 @@ def train_model(options, trial=None, results_dir_override=None):
 
     # Load best model and evaluate on test set
     load_checkpoint(model, results_dir)
-    test_metrics = evaluate(model, test_loader, criterion, device)
+    test_metrics = evaluate_full(model, test_loader, criterion, device, class_names)
 
     # Measure inference time
     input_size = options["data"]["input_size"]
@@ -706,9 +992,14 @@ def train_model(options, trial=None, results_dir_override=None):
         "best_val_acc_top1": best_val_acc_top1,
         "best_epoch": best_epoch,
         "final_test_acc_top1": test_metrics["acc_top1"],
+        "final_test_f1": test_metrics["macro_f1"],
+        "final_test_precision": test_metrics["macro_precision"],
+        "final_test_recall": test_metrics["macro_recall"],
         "inference_time_ms": inference_time,
         "total_params": total_params,
         "trainable_params": trainable_params,
+        "per_class_test_f1": test_metrics["per_class_f1"],
+        "per_class_test_acc": test_metrics["per_class_acc"],
     }
 
     print_final_results(results)

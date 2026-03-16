@@ -1,0 +1,11 @@
+{
+  "experiment_name": "swin_transformer_optimized",
+  "best_val_acc_top1": 0.9148550940596539,
+  "best_val_acc_top3": 1.0,
+  "best_epoch": 77,
+  "final_test_acc_top1": 0.9409722437461218,
+  "final_test_acc_top3": 1.0,
+  "inference_time_ms": 8.174367528408766,
+  "total_params": 28310910,
+  "trainable_params": 28310910
+}

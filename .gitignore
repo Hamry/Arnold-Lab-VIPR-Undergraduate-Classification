@@ -1,5 +1,10 @@
 /final_split_dataset
 
+*.db
+
+*.err
+*.out
+
 *.pt
 *.pth
 

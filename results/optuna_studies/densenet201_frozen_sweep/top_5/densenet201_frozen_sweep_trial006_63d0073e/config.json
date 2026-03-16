@@ -1,0 +1,37 @@
+{
+  "experiment_name": "densenet201_frozen_sweep_trial006_63d0073e",
+  "model": {
+    "backbone": "densenet201",
+    "pretrained": true,
+    "freeze_backbone": true,
+    "classifier_hidden": [
+      1024
+    ],
+    "dropout": 0.11956514272323476
+  },
+  "data": {
+    "path": "/scratch/hl98745/data/final_split_dataset",
+    "input_size": 224,
+    "batch_size": 32,
+    "num_workers": 8
+  },
+  "augmentations": {
+    "horizontal_flip": true,
+    "vertical_flip": false,
+    "random_rotation": 17.685314399981166,
+    "color_jitter": 0.030348829400108898,
+    "random_crop_scale": [
+      0.8,
+      1.0
+    ]
+  },
+  "training": {
+    "epochs": 50,
+    "learning_rate": 0.0019015356406080805,
+    "optimizer": "adamw",
+    "weight_decay": 0.0003663288417413952,
+    "scheduler": "cosine",
+    "seed": 42,
+    "early_stopping_patience": 20
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "experiment_name": "resnet152_gradual_unfreeze_sweep_trial012_5d4db8f7",
+  "best_val_acc_top1": 0.9206204379562044,
+  "best_epoch": 46,
+  "final_test_acc_top1": 0.9403254972875226,
+  "final_test_f1": 0.9338884502882177,
+  "final_test_precision": 0.9325354137031768,
+  "final_test_recall": 0.9354573905242827,
+  "inference_time_ms": 13.963320199400187,
+  "total_params": 64442436,
+  "trainable_params": 64442436,
+  "per_class_test_f1": {
+    "blurry": 0.9074889867841409,
+    "good": 0.9677419354838709,
+    "opaque": 0.8990825688073394,
+    "yellow": 0.9612403100775193
+  },
+  "per_class_test_acc": {
+    "blurry": 0.911504424778761,
+    "good": 0.9605911330049262,
+    "opaque": 0.9158878504672897,
+    "yellow": 0.9538461538461539
+  }
+}

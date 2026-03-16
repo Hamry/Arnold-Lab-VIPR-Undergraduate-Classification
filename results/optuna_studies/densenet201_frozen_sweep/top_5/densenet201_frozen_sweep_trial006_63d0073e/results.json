@@ -1,0 +1,24 @@
+{
+  "experiment_name": "densenet201_frozen_sweep_trial006_63d0073e",
+  "best_val_acc_top1": 0.8768248175182481,
+  "best_epoch": 34,
+  "final_test_acc_top1": 0.8752260397830018,
+  "final_test_f1": 0.8644422907574192,
+  "final_test_precision": 0.8654887433169749,
+  "final_test_recall": 0.8675211236790953,
+  "inference_time_ms": 18.697258662432432,
+  "total_params": 20064132,
+  "trainable_params": 1971204,
+  "per_class_test_f1": {
+    "blurry": 0.7834101382488479,
+    "good": 0.9203980099502488,
+    "opaque": 0.829059829059829,
+    "yellow": 0.9249011857707511
+  },
+  "per_class_test_acc": {
+    "blurry": 0.7522123893805309,
+    "good": 0.9113300492610837,
+    "opaque": 0.9065420560747663,
+    "yellow": 0.9
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "experiment_name": "alexnet_frozen",
+  "best_val_acc_top1": 0.8883928571428571,
+  "best_val_acc_top3": 0.9964285714285714,
+  "best_epoch": 21,
+  "final_test_acc_top1": 0.8975694444444444,
+  "final_test_acc_top3": 1.0,
+  "inference_time_ms": 0.6515799090266228,
+  "total_params": 61203268,
+  "trainable_params": 58733572
+}

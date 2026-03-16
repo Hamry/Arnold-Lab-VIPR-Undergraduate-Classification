@@ -1,0 +1,24 @@
+{
+  "experiment_name": "vgg19_frozen_sweep_trial016_5f87d5cd",
+  "best_val_acc_top1": 0.8093065693430657,
+  "best_epoch": 12,
+  "final_test_acc_top1": 0.8010849909584087,
+  "final_test_f1": 0.7833335140929274,
+  "final_test_precision": 0.7871845473931297,
+  "final_test_recall": 0.7868388863609732,
+  "inference_time_ms": 1.4795070514082909,
+  "total_params": 143769668,
+  "trainable_params": 123745284,
+  "per_class_test_f1": {
+    "blurry": 0.6796116504854369,
+    "good": 0.8756218905472638,
+    "opaque": 0.7364016736401673,
+    "yellow": 0.8416988416988418
+  },
+  "per_class_test_acc": {
+    "blurry": 0.6194690265486725,
+    "good": 0.8669950738916257,
+    "opaque": 0.822429906542056,
+    "yellow": 0.8384615384615385
+  }
+}

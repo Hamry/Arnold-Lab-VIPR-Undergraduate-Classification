@@ -1,0 +1,37 @@
+{
+  "experiment_name": "convnext_base_frozen_sweep_trial020_16cec21a",
+  "model": {
+    "backbone": "convnext_base",
+    "pretrained": true,
+    "freeze_backbone": true,
+    "classifier_hidden": [
+      512
+    ],
+    "dropout": 0.16407238909539523
+  },
+  "data": {
+    "path": "/scratch/hl98745/data/final_split_dataset",
+    "input_size": 224,
+    "batch_size": 32,
+    "num_workers": 8
+  },
+  "augmentations": {
+    "horizontal_flip": true,
+    "vertical_flip": false,
+    "random_rotation": 3.988412340443566,
+    "color_jitter": 0.07223541222825178,
+    "random_crop_scale": [
+      0.8,
+      1.0
+    ]
+  },
+  "training": {
+    "epochs": 50,
+    "learning_rate": 0.001062799873039218,
+    "optimizer": "adamw",
+    "weight_decay": 0.0007655587266171681,
+    "scheduler": "cosine",
+    "seed": 42,
+    "early_stopping_patience": 20
+  }
+}

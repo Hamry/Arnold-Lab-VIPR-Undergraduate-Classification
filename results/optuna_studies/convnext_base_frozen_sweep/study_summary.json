@@ -1,0 +1,48 @@
+{
+  "study_name": "convnext_base_frozen_sweep",
+  "updated_at": "2026-02-23T18:27:10.850268",
+  "n_trials_completed": 25,
+  "n_trials_pruned": 0,
+  "n_trials_failed": 0,
+  "n_trials_total": 25,
+  "best_trial": {
+    "number": 21,
+    "value": 0.8914233576642335,
+    "params": {
+      "training.learning_rate": 0.001109695921292961,
+      "training.weight_decay": 0.0011553950042708049,
+      "augmentations.color_jitter": 0.07226966699582908,
+      "augmentations.random_rotation": 4.725081995744741,
+      "model.classifier_hidden_idx": 0,
+      "model.dropout": 0.16973752397472297
+    },
+    "trial_name": "convnext_base_frozen_sweep_trial021_122d1535"
+  },
+  "top_5_trials": [
+    {
+      "number": 21,
+      "value": 0.8914233576642335,
+      "trial_name": "convnext_base_frozen_sweep_trial021_122d1535"
+    },
+    {
+      "number": 20,
+      "value": 0.8895985401459854,
+      "trial_name": "convnext_base_frozen_sweep_trial020_16cec21a"
+    },
+    {
+      "number": 2,
+      "value": 0.8859489051094891,
+      "trial_name": "convnext_base_frozen_sweep_trial002_cbb600f7"
+    },
+    {
+      "number": 23,
+      "value": 0.8859489051094891,
+      "trial_name": "convnext_base_frozen_sweep_trial023_884cbfd8"
+    },
+    {
+      "number": 19,
+      "value": 0.885036496350365,
+      "trial_name": "convnext_base_frozen_sweep_trial019_bb89ee80"
+    }
+  ]
+}

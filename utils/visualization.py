@@ -50,6 +50,34 @@ PLOT_STYLE = {
     'axes.spines.right': False,
 }
 
+# IEEE-style publication settings (Times New Roman, inward ticks, minimal grid)
+IEEE_PLOT_STYLE = {
+    'font.family': 'serif',
+    'font.serif': ['Times New Roman', 'Times', 'DejaVu Serif'],
+    'font.size': 9,
+    'axes.labelsize': 9,
+    'axes.titlesize': 10,
+    'axes.titleweight': 'bold',
+    'legend.fontsize': 8,
+    'legend.framealpha': 0.9,
+    'legend.edgecolor': '0.8',
+    'xtick.labelsize': 8,
+    'ytick.labelsize': 8,
+    'figure.dpi': 100,
+    'savefig.dpi': 300,
+    'axes.grid': True,
+    'grid.alpha': 0.2,
+    'grid.linestyle': '--',
+    'axes.spines.top': False,
+    'axes.spines.right': False,
+    'lines.linewidth': 1.5,
+    'axes.linewidth': 0.8,
+    'xtick.direction': 'in',
+    'ytick.direction': 'in',
+    'xtick.major.size': 3,
+    'ytick.major.size': 3,
+}
+
 
 # ---------------------------------------------------------------------------
 # Data Loading Functions

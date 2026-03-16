@@ -3,7 +3,16 @@ import shutil
 import random
 import math
 
-def merge_and_split_dataset(source_dir1, source_dir2, dest_dir, train_ratio=0.7, val_ratio=0.2, test_ratio=0.1):
+
+def merge_and_split_dataset(
+    source_dir1,
+    source_dir2,
+    dest_dir,
+    train_ratio=0.7,
+    val_ratio=0.2,
+    test_ratio=0.1,
+    n=1000,
+):
     """
     Merges two source directories with identical class subfolders and splits them
     into a single new dataset for machine learning.
@@ -17,12 +26,12 @@ def merge_and_split_dataset(source_dir1, source_dir2, dest_dir, train_ratio=0.7,
         test_ratio (float): Proportion for the test set.
     """
     # --- 1. Setup and Validation ---
-    if not math.isclose(train_ratio + val_ratio + test_ratio,1.0):
+    if not math.isclose(train_ratio + val_ratio + test_ratio, 1.0):
         print("Error: Ratios must sum to 1.0")
         return
 
-    categories = ['Blurry', 'Good', 'Opaque', 'Yellow']
-    splits = ['train', 'validate', 'test']
+    categories = ["Blurry", "Good", "Opaque", "Yellow"]
+    splits = ["train", "validate", "test"]
 
     # --- 2. Create Destination Directory Structure ---
     print(f"Setting up destination directory at: {dest_dir}")
@@ -35,7 +44,7 @@ def merge_and_split_dataset(source_dir1, source_dir2, dest_dir, train_ratio=0.7,
     # --- 3. Process Each Category ---
     for category in categories:
         print(f"\nProcessing category: {category}")
-        
+
         # --- 4. Gather and Combine All Image Paths ---
         all_image_paths = []
         for source_main_dir in [source_dir1, source_dir2]:
@@ -43,24 +52,28 @@ def merge_and_split_dataset(source_dir1, source_dir2, dest_dir, train_ratio=0.7,
             if not os.path.isdir(category_path):
                 print(f"Warning: Directory not found, skipping: {category_path}")
                 continue
-            
+
             # Get full paths to each image
             images = [os.path.join(category_path, f) for f in os.listdir(category_path)]
+            random.shuffle(images)
+            images = images[: n // 2]
             all_image_paths.extend(images)
-        
+
         # --- 5. Shuffle and Split the Combined List ---
         random.shuffle(all_image_paths)
-        
+
         total_images = len(all_image_paths)
         train_end = int(total_images * train_ratio)
         val_end = train_end + int(total_images * val_ratio)
-        
+
         train_files = all_image_paths[:train_end]
         val_files = all_image_paths[train_end:val_end]
         test_files = all_image_paths[val_end:]
-        
+
         print(f"  - Found {total_images} total images.")
-        print(f"  - Splitting into: {len(train_files)} train, {len(val_files)} validate, {len(test_files)} test.")
+        print(
+            f"  - Splitting into: {len(train_files)} train, {len(val_files)} validate, {len(test_files)} test."
+        )
 
         # --- 6. Copy Files to Their New Homes ---
         def copy_files(files, split_name):
@@ -70,9 +83,9 @@ def merge_and_split_dataset(source_dir1, source_dir2, dest_dir, train_ratio=0.7,
                 dest_path = os.path.join(dest_dir, split_name, category, filename)
                 shutil.copy2(source_path, dest_path)
 
-        copy_files(train_files, 'train')
-        copy_files(val_files, 'validate')
-        copy_files(test_files, 'test')
+        copy_files(train_files, "train")
+        copy_files(val_files, "validate")
+        copy_files(test_files, "test")
 
     print("\n✅ Dataset merging and splitting complete!")
 
@@ -82,13 +95,13 @@ def merge_and_split_dataset(source_dir1, source_dir2, dest_dir, train_ratio=0.7,
 # =============================================================================
 
 # 1. Define the path to your 'colonized' images folder.
-colonized_folder = './Colonized'
+colonized_folder = "./Colonized"
 
 # 2. Define the path to your 'noncolonized' images folder.
-noncolonized_folder = './Noncolonized'
+noncolonized_folder = "./Noncolonized"
 
 # 3. Define where you want the final, split dataset to be created.
-final_dataset_folder = './final_split_dataset'
+final_dataset_folder = "./final_split_dataset"
 
 # 4. Run the function with your defined paths.
 merge_and_split_dataset(
@@ -97,5 +110,5 @@ merge_and_split_dataset(
     dest_dir=final_dataset_folder,
     train_ratio=0.7,
     val_ratio=0.2,
-    test_ratio=0.1
+    test_ratio=0.1,
 )

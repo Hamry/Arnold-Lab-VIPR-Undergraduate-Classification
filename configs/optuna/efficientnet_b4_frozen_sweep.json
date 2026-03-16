@@ -1,0 +1,44 @@
+{
+    "study_name": "efficientnet_b4_frozen_sweep",
+    "base_config_path": "configs/efficientnet_b4.json",
+    "n_trials": 25,
+    "timeout_hours": 12,
+    "pruning": {
+        "enabled": false
+    },
+    "cleanup": {
+        "keep_top_n": 5,
+        "cleanup_frequency": 5
+    },
+    "search_space": {
+        "training.learning_rate": {
+            "type": "log_float",
+            "low": 1e-4,
+            "high": 1e-2
+        },
+        "training.weight_decay": {
+            "type": "log_float",
+            "low": 1e-5,
+            "high": 1e-2
+        },
+        "augmentations.color_jitter": {
+            "type": "float",
+            "low": 0.0,
+            "high": 0.15
+        },
+        "augmentations.random_rotation": {
+            "type": "float",
+            "low": 0.0,
+            "high": 30.0
+        },
+        "model.classifier_hidden": {
+            "type": "categorical",
+            "choices": [[512], [1024], [2048], [1024, 512], [2048, 1024]]
+        },
+        "model.dropout": {
+            "type": "float",
+            "low": 0.1,
+            "high": 0.5
+        }
+    }
+}

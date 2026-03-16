@@ -1,0 +1,11 @@
+{
+  "experiment_name": "inception_v3_frozen",
+  "best_val_acc_top1": 0.7508928571428571,
+  "best_val_acc_top3": 0.9866071428571429,
+  "best_epoch": 39,
+  "final_test_acc_top1": 0.8038194444444444,
+  "final_test_acc_top3": 0.9878472222222222,
+  "inference_time_ms": 8.843136429786682,
+  "total_params": 27214540,
+  "trainable_params": 2102276
+}

@@ -1,0 +1,24 @@
+{
+  "experiment_name": "resnet152_frozen_sweep_trial002_59ba91c7",
+  "best_val_acc_top1": 0.8905109489051095,
+  "best_epoch": 36,
+  "final_test_acc_top1": 0.8933092224231465,
+  "final_test_f1": 0.8839918784584255,
+  "final_test_precision": 0.8829166666666667,
+  "final_test_recall": 0.8854623155984385,
+  "inference_time_ms": 13.083499111235142,
+  "total_params": 64442436,
+  "trainable_params": 6298628,
+  "per_class_test_f1": {
+    "blurry": 0.8070175438596492,
+    "good": 0.9330024813895781,
+    "opaque": 0.8584474885844748,
+    "yellow": 0.9375
+  },
+  "per_class_test_acc": {
+    "blurry": 0.8141592920353983,
+    "good": 0.9261083743842364,
+    "opaque": 0.8785046728971962,
+    "yellow": 0.9230769230769231
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "experiment_name": "efficientnet_b4_frozen_sweep_trial011_1059d205",
+  "best_val_acc_top1": 0.8759124087591241,
+  "best_epoch": 23,
+  "final_test_acc_top1": 0.8679927667269439,
+  "final_test_f1": 0.859796236638468,
+  "final_test_precision": 0.8649370006274318,
+  "final_test_recall": 0.8561191280634926,
+  "inference_time_ms": 11.743542067706585,
+  "total_params": 19911500,
+  "trainable_params": 2362884,
+  "per_class_test_f1": {
+    "blurry": 0.8347826086956521,
+    "good": 0.8942307692307692,
+    "opaque": 0.8039215686274509,
+    "yellow": 0.90625
+  },
+  "per_class_test_acc": {
+    "blurry": 0.8495575221238938,
+    "good": 0.916256157635468,
+    "opaque": 0.7663551401869159,
+    "yellow": 0.8923076923076924
+  }
+}

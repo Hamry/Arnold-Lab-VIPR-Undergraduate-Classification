@@ -12,10 +12,12 @@ A config-driven deep learning framework for benchmarking pretrained CNN/Transfor
 - [Configuration Reference](#configuration-reference)
   - [Standard Training Config](#standard-training-config)
   - [Progressive Unfreezing Config](#progressive-unfreezing-thaw-config)
+  - [Dynamic Unfreezing Config](#dynamic-unfreezing-config)
   - [Optuna Search Config](#optuna-search-config)
 - [Supported Backbones](#supported-backbones)
 - [Dataset Format](#dataset-format)
 - [Results Structure](#results-structure)
+- [Dataset Audit Tool](#dataset-audit-tool)
 
 ---
 
@@ -287,6 +289,63 @@ Extends standard config with backbone unfreezing schedule for fine-tuning.
 
 ---
 
+### Dynamic Unfreezing Config
+
+Extends the standard config with **plateau-triggered** automatic backbone thawing. Unlike `thaw_schedule` (which unfreezes at fixed epochs), dynamic unfreezing monitors validation loss and thaws the next group of backbone layers only when progress stalls.
+
+**Example:** `configs/resnet152_dynamic_unfreeze.json`
+
+```json
+{
+    "experiment_name": "resnet152_dynamic_unfreeze",
+
+    "model": {
+        "backbone": "resnet152",
+        "pretrained": true,
+        "freeze_backbone": true,
+        "classifier_hidden": [2048, 1024],
+        "dropout": 0.32
+    },
+
+    "data": { ... },
+    "augmentations": { ... },
+
+    "training": {
+        "epochs": 100,
+        "learning_rate": 0.0006,
+        "optimizer": "adamw",
+        "weight_decay": 3e-5,
+        "scheduler": "cosine",
+        "seed": 42,
+        "early_stopping_patience": 20,
+
+        "dynamic_unfreeze": {
+            "unfreeze_patience": 8,
+            "unfreeze_size": 1,
+            "lr_decay_ratio": 0.1
+        }
+    }
+}
+```
+
+#### Dynamic Unfreezing Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `unfreeze_patience` | int | Epochs with no val-loss improvement before thawing the next unit |
+| `unfreeze_size` | int | Number of backbone units to thaw per trigger event |
+| `lr_decay_ratio` | float | LR multiplier per depth level — deeper units use `base_lr × ratio^depth` |
+
+**How Dynamic Unfreezing Works:**
+1. Training starts with the backbone fully frozen (only classifier trains).
+2. `DynamicThawController` tracks validation loss; when improvement stalls for `unfreeze_patience` epochs, it thaws the next `unfreeze_size` units moving from output layers toward input.
+3. Each newly unfrozen group receives a decayed learning rate (`base_lr × lr_decay_ratio^depth`), preventing catastrophic forgetting of early features.
+4. Compatible with all CNN backbones (ResNet, DenseNet, VGG, EfficientNet, etc.) and Vision Transformers (ViT, Swin).
+
+> **Note:** `thaw_schedule` and `dynamic_unfreeze` are mutually exclusive. If both keys are present, `dynamic_unfreeze` takes precedence.
+
+---
+
 ### Optuna Search Config
 
 Defines the hyperparameter search space for Bayesian optimization.
@@ -388,7 +447,26 @@ Defines the hyperparameter search space for Bayesian optimization.
 
 #### Search Space Types
 
-Each parameter in `search_space` uses dot notation (e.g., `training.learning_rate`) and requires:
+Each parameter in `search_space` uses dot notation (e.g., `training.learning_rate`) and requires. Nested keys work too — for example, sweeping dynamic unfreezing hyperparameters:
+
+```json
+"search_space": {
+    "training.dynamic_unfreeze.lr_decay_ratio": {
+        "type": "log_float",
+        "low": 0.01,
+        "high": 0.5
+    },
+    "training.dynamic_unfreeze.unfreeze_patience": {
+        "type": "int",
+        "low": 3,
+        "high": 20
+    }
+}
+```
+
+See `configs/optuna/resnet152_gradual_unfreeze_sweep.json` for a working example.
+
+##### Type Reference
 
 | Type | Parameters | Description |
 |------|------------|-------------|
@@ -498,3 +576,48 @@ tail -f vipr_train_*.out
 # Cancel a job
 scancel <job_id>
 ```
+
+---
+
+## Dataset Audit Tool
+
+`audit_dataset.py` loads a trained model from any experiment results directory, runs inference over a dataset split, and saves every misclassified image into an organised folder structure for manual inspection.
+
+### Usage
+
+```bash
+# Audit the validate split (default)
+python audit_dataset.py results/resnet152_frozen
+
+# Audit the test split
+python audit_dataset.py results/resnet152_frozen --split test
+
+# Override the data path (useful when running locally with a different data location)
+python audit_dataset.py results/resnet152_frozen --split test --data-path /local/path/to/data
+
+# Audit an Optuna best trial
+python audit_dataset.py results/optuna_studies/resnet152_fine_tuning_sweep/best
+```
+
+### Arguments
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `results_dir` | (required) | Path to the experiment results directory containing `config.json` and `best_model.pth` |
+| `--split` | `validate` | Dataset split to evaluate: `train`, `validate`, or `test` |
+| `--output` | `dataset_audit` | Output directory for misclassified images and summary file |
+| `--data-path` | (from config) | Override the data root from `config.json` |
+
+### Output Structure
+
+```
+dataset_audit/
+├── Blurry_as_Good/
+│   ├── 9421_img_001.jpg    ← confidence prefix in basis points (9421 = 94.21%)
+│   └── ...
+├── Good_as_Opaque/
+│   └── ...
+└── audit_summary.txt       ← overall accuracy, per-class accuracy, bucket counts
+```
+
+Each misclassified image is copied into a `{CorrectClass}_as_{GuessedClass}/` folder. The filename is prefixed with a 4-digit basis-point confidence score so images can be sorted by model certainty.

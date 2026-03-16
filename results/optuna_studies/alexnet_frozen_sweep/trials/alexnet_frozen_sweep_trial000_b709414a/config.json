@@ -1,0 +1,37 @@
+{
+  "experiment_name": "alexnet_frozen_sweep_trial000_b709414a",
+  "model": {
+    "backbone": "alexnet",
+    "pretrained": true,
+    "freeze_backbone": true,
+    "classifier_hidden": [
+      1024
+    ],
+    "dropout": 0.3296093201264537
+  },
+  "data": {
+    "path": "/scratch/hl98745/data/final_split_dataset",
+    "input_size": 224,
+    "batch_size": 32,
+    "num_workers": 8
+  },
+  "augmentations": {
+    "horizontal_flip": true,
+    "vertical_flip": false,
+    "random_rotation": 0.005647261607347742,
+    "color_jitter": 0.12100118503000282,
+    "random_crop_scale": [
+      0.8,
+      1.0
+    ]
+  },
+  "training": {
+    "epochs": 50,
+    "learning_rate": 0.00018054198515977864,
+    "optimizer": "adamw",
+    "weight_decay": 0.009597250359273992,
+    "scheduler": "cosine",
+    "seed": 42,
+    "early_stopping_patience": 20
+  }
+}

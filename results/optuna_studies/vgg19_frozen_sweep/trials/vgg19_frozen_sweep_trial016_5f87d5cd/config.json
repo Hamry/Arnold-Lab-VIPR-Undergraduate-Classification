@@ -1,0 +1,37 @@
+{
+  "experiment_name": "vgg19_frozen_sweep_trial016_5f87d5cd",
+  "model": {
+    "backbone": "vgg19",
+    "pretrained": true,
+    "freeze_backbone": true,
+    "classifier_hidden": [
+      1024
+    ],
+    "dropout": 0.10632547924325675
+  },
+  "data": {
+    "path": "/scratch/hl98745/data/final_split_dataset",
+    "input_size": 224,
+    "batch_size": 32,
+    "num_workers": 8
+  },
+  "augmentations": {
+    "horizontal_flip": true,
+    "vertical_flip": false,
+    "random_rotation": 3.5984661663143167,
+    "color_jitter": 0.128810763254121,
+    "random_crop_scale": [
+      0.8,
+      1.0
+    ]
+  },
+  "training": {
+    "epochs": 50,
+    "learning_rate": 0.0005978571680383274,
+    "optimizer": "adamw",
+    "weight_decay": 0.0017073007922007257,
+    "scheduler": "cosine",
+    "seed": 42,
+    "early_stopping_patience": 20
+  }
+}

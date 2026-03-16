@@ -1,0 +1,24 @@
+{
+  "experiment_name": "alexnet_frozen_sweep_trial024_6bc4332a",
+  "best_val_acc_top1": 0.8932481751824818,
+  "best_epoch": 22,
+  "final_test_acc_top1": 0.8788426763110307,
+  "final_test_f1": 0.8713400837933536,
+  "final_test_precision": 0.8679604934713596,
+  "final_test_recall": 0.8771918546575672,
+  "inference_time_ms": 0.6325620040297508,
+  "total_params": 65402692,
+  "trainable_params": 62932996,
+  "per_class_test_f1": {
+    "blurry": 0.825531914893617,
+    "good": 0.9211195928753181,
+    "opaque": 0.8533333333333333,
+    "yellow": 0.8853754940711462
+  },
+  "per_class_test_acc": {
+    "blurry": 0.8584070796460177,
+    "good": 0.8916256157635468,
+    "opaque": 0.897196261682243,
+    "yellow": 0.8615384615384616
+  }
+}

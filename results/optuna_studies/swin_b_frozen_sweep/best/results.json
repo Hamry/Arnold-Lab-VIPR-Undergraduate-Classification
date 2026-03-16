@@ -1,0 +1,24 @@
+{
+  "experiment_name": "swin_b_frozen_sweep_trial006_9fb8a069",
+  "best_val_acc_top1": 0.8759124087591241,
+  "best_epoch": 47,
+  "final_test_acc_top1": 0.8896925858951176,
+  "final_test_f1": 0.8816388532005752,
+  "final_test_precision": 0.8815371959102127,
+  "final_test_recall": 0.88222484638642,
+  "inference_time_ms": 15.998452198691668,
+  "total_params": 88850620,
+  "trainable_params": 2107396,
+  "per_class_test_f1": {
+    "blurry": 0.8240343347639485,
+    "good": 0.9257425742574258,
+    "opaque": 0.8584905660377359,
+    "yellow": 0.9182879377431907
+  },
+  "per_class_test_acc": {
+    "blurry": 0.8495575221238938,
+    "good": 0.9211822660098522,
+    "opaque": 0.8504672897196262,
+    "yellow": 0.9076923076923077
+  }
+}
