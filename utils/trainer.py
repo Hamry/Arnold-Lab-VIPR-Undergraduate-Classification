@@ -17,8 +17,13 @@ matplotlib.use('Agg')  # Non-interactive backend for SLURM/headless
 
 import torch
 import torch.nn as nn
-from torch.amp.grad_scaler import GradScaler
-from torch.amp.autocast_mode import autocast
+# AMP imports (compatible across PyTorch versions)
+try:
+    # Newer PyTorch
+    from torch.amp import GradScaler, autocast
+except Exception:
+    # Older / widely supported
+    from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
@@ -321,7 +326,7 @@ def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, devi
 
         optimizer.zero_grad()
 
-        with autocast("cuda"):
+        with autocast(enabled=(device.type == "cuda")):
             outputs = model(inputs)
             loss = criterion(outputs, targets)
 
@@ -353,7 +358,7 @@ def evaluate(model, loader, criterion, device):
         for inputs, targets in loader:
             inputs, targets = inputs.to(device), targets.to(device)
 
-            with autocast("cuda"):
+            with autocast(enabled=(device.type == "cuda")):
                 outputs = model(inputs)
                 loss = criterion(outputs, targets)
 
@@ -389,7 +394,7 @@ def evaluate_with_predictions(model, loader, device):
         for inputs, targets in loader:
             inputs, targets = inputs.to(device), targets.to(device)
 
-            with autocast("cuda"):
+            with autocast(enabled=(device.type == "cuda")):
                 outputs = model(inputs)
 
             _, predicted = outputs.max(1)
@@ -623,7 +628,7 @@ def train_model(options, trial=None, results_dir_override=None):
     criterion = nn.CrossEntropyLoss()
     optimizer = create_optimizer(model, options, backbone_name)
     scheduler = create_scheduler(optimizer, options, len(train_loader))
-    scaler = GradScaler("cuda")
+    scaler = GradScaler(enabled = (device.type == "cuda"))
 
     # Early stopping
     early_stopping = EarlyStopping(patience=patience)

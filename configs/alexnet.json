@@ -8,7 +8,7 @@
         "dropout": 0.2
     },
     "data": {
-        "path": "/scratch/hl98745/data/final_split_dataset",
+        "path": "/scratch/vk44347/workDir/data",
         "input_size": 224,
         "batch_size": 32,
         "num_workers": 4

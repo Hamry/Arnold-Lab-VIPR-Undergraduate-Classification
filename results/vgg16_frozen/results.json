@@ -1,0 +1,9 @@
+{
+  "experiment_name": "vgg16_frozen",
+  "best_val_acc_top1": 0.8232142857142857,
+  "best_epoch": 45,
+  "final_test_acc_top1": 0.835841049750646,
+  "inference_time_ms": 1.3300168886780739,
+  "total_params": 138459972,
+  "trainable_params": 123745284
+}

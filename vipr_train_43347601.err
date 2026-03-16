@@ -1,0 +1,17 @@
+Traceback (most recent call last):
+  File "/scratch/vk44347/workDir/Arnold-Lab-VIPR-Undergraduate-Classification/run_experiment.py", line 31, in <module>
+    main()
+  File "/scratch/vk44347/workDir/Arnold-Lab-VIPR-Undergraduate-Classification/run_experiment.py", line 25, in main
+    results = train_model(options)
+  File "/scratch/vk44347/workDir/Arnold-Lab-VIPR-Undergraduate-Classification/utils/trainer.py", line 665, in train_model
+    train_loss = train_one_epoch(
+  File "/scratch/vk44347/workDir/Arnold-Lab-VIPR-Undergraduate-Classification/utils/trainer.py", line 333, in train_one_epoch
+    scaler.scale(loss).backward()
+  File "/scratch/vk44347/workDir/scratch_venv/lib/python3.10/site-packages/torch/cuda/amp/grad_scaler.py", line 168, in scale
+    self._lazy_init_scale_growth_tracker(outputs.device)
+  File "/scratch/vk44347/workDir/scratch_venv/lib/python3.10/site-packages/torch/cuda/amp/grad_scaler.py", line 148, in _lazy_init_scale_growth_tracker
+    self._scale = torch.full((1,), self._init_scale, dtype=torch.float32, device=dev)
+TypeError: full() received an invalid combination of arguments - got (tuple, str, device=torch.device, dtype=torch.dtype), but expected one of:
+ * (tuple of ints size, Number fill_value, *, tuple of names names, torch.dtype dtype, torch.layout layout, torch.device device, bool pin_memory, bool requires_grad)
+ * (tuple of ints size, Number fill_value, *, Tensor out, torch.dtype dtype, torch.layout layout, torch.device device, bool pin_memory, bool requires_grad)
+

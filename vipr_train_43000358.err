@@ -1,0 +1,15 @@
+/var/spool/slurmd/job43000358/slurm_script: line 40: /scratch/hl98745/scratch_venv/bin/activate: Permission denied
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+ModuleNotFoundError: No module named 'torch'
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+ModuleNotFoundError: No module named 'torch'
+Traceback (most recent call last):
+  File "/scratch/vk44347/workDir/Arnold-Lab-VIPR-Undergraduate-Classification/run_experiment.py", line 12, in <module>
+    from utils import train_model
+  File "/scratch/vk44347/workDir/Arnold-Lab-VIPR-Undergraduate-Classification/utils/__init__.py", line 7, in <module>
+    from .model_utils import load_model, count_parameters, BACKBONE_REGISTRY
+  File "/scratch/vk44347/workDir/Arnold-Lab-VIPR-Undergraduate-Classification/utils/model_utils.py", line 8, in <module>
+    import torch
+ModuleNotFoundError: No module named 'torch'

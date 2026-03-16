@@ -1,0 +1,16 @@
+Downloading: "https://download.pytorch.org/models/alexnet-owt-7be5be79.pth" to /home/vk44347/.cache/torch/hub/checkpoints/alexnet-owt-7be5be79.pth
+  0%|          | 0.00/233M [00:00<?, ?B/s]  2%|▏         | 4.27M/233M [00:00<00:05, 44.7MB/s]  7%|▋         | 15.5M/233M [00:00<00:02, 87.5MB/s] 11%|█         | 26.0M/233M [00:00<00:02, 98.1MB/s] 16%|█▌        | 37.2M/233M [00:00<00:01, 105MB/s]  21%|██        | 49.0M/233M [00:00<00:01, 112MB/s] 26%|██▌       | 59.7M/233M [00:00<00:01, 112MB/s] 31%|███       | 71.6M/233M [00:00<00:01, 116MB/s] 36%|███▌      | 82.8M/233M [00:00<00:01, 116MB/s] 40%|████      | 93.9M/233M [00:00<00:01, 116MB/s] 45%|████▌     | 105M/233M [00:01<00:01, 117MB/s]  50%|████▉     | 116M/233M [00:01<00:01, 117MB/s] 55%|█████▍    | 128M/233M [00:01<00:00, 117MB/s] 60%|█████▉    | 139M/233M [00:01<00:00, 115MB/s] 64%|██████▍   | 150M/233M [00:01<00:00, 114MB/s] 69%|██████▉   | 162M/233M [00:01<00:00, 116MB/s] 74%|███████▍  | 174M/233M [00:01<00:00, 119MB/s] 79%|███████▉  | 185M/233M [00:01<00:00, 118MB/s] 84%|████████▍ | 196M/233M [00:01<00:00, 116MB/s] 89%|████████▉ | 208M/233M [00:01<00:00, 119MB/s] 94%|█████████▍| 220M/233M [00:02<00:00, 118MB/s] 99%|█████████▉| 231M/233M [00:02<00:00, 116MB/s]100%|██████████| 233M/233M [00:02<00:00, 114MB/s]
+Traceback (most recent call last):
+  File "/scratch/vk44347/workDir/Arnold-Lab-VIPR-Undergraduate-Classification/run_experiment.py", line 31, in <module>
+    main()
+  File "/scratch/vk44347/workDir/Arnold-Lab-VIPR-Undergraduate-Classification/run_experiment.py", line 25, in main
+    results = train_model(options)
+  File "/scratch/vk44347/workDir/Arnold-Lab-VIPR-Undergraduate-Classification/utils/trainer.py", line 665, in train_model
+    train_loss = train_one_epoch(
+  File "/scratch/vk44347/workDir/Arnold-Lab-VIPR-Undergraduate-Classification/utils/trainer.py", line 329, in train_one_epoch
+    with autocast("cuda"):
+  File "/scratch/vk44347/workDir/scratch_venv/lib/python3.10/site-packages/torch/cuda/amp/autocast_mode.py", line 30, in __enter__
+    return super().__enter__()
+  File "/scratch/vk44347/workDir/scratch_venv/lib/python3.10/site-packages/torch/amp/autocast_mode.py", line 265, in __enter__
+    torch.set_autocast_enabled(self._enabled)
+TypeError: enabled must be a bool (got str)
