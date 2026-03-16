@@ -503,7 +503,7 @@ def evaluate_full(model, loader, criterion, device, class_names):
         for inputs, targets in loader:
             inputs, targets = inputs.to(device), targets.to(device)
 
-            with autocast("cuda"):
+            with autocast(enabled=(device.type == "cuda")):
                 outputs = model(inputs)
                 loss = criterion(outputs, targets)
 
