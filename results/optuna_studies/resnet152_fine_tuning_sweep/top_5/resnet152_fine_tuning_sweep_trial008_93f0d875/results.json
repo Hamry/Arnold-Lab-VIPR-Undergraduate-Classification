@@ -1,9 +1,0 @@
-{
-  "experiment_name": "resnet152_fine_tuning_sweep_trial008_93f0d875",
-  "best_val_acc_top1": 0.9133928571428571,
-  "best_epoch": 36,
-  "final_test_acc_top1": 0.9191743830839793,
-  "inference_time_ms": 13.217884600162506,
-  "total_params": 60246084,
-  "trainable_params": 60020740
-}
