@@ -259,7 +259,7 @@ def filter_and_split_dataset(
 # --- HOW TO USE ---
 # =============================================================================
 # 0. Define the base path where your source and destination folders live.
-base_path = "/work/ompla/HL98745"
+base_path = "/work/omlpa/HL98745"
 
 # 1. Define the path to your 'colonized' images folder.
 colonized_folder = f"{base_path}/Colonized"
@@ -272,7 +272,7 @@ final_dataset_folder = f"{base_path}/data/single_label_category_balanced_filtere
 
 # 4. Define the path to your experiment results directory.
 #    This folder must contain config.json and best_model.pth.
-model_results_dir = "./results/optuna_studies/convnext_base_frozen_sweep"
+model_results_dir = "./results/optuna_studies/convnext_base_frozen_sweep/best"
 
 # 5. Run the function with your defined paths.
 filter_and_split_dataset(
