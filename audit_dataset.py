@@ -27,7 +27,7 @@ from torchvision import datasets
 sys.path.insert(0, str(Path(__file__).parent))
 
 from utils.model_utils import load_model
-from utils.trainer import build_eval_transforms, load_checkpoint
+from utils.trainer import build_eval_transforms, load_checkpoint, logits_to_probs
 
 
 def parse_args():
@@ -69,7 +69,8 @@ def load_config(results_dir: Path, data_path_override: Path | None) -> dict:
     return options
 
 
-def run_inference(model, dataset, batch_size: int, device: torch.device):
+def run_inference(model, dataset, batch_size: int, device: torch.device,
+                  loss_fn: str = "cross_entropy"):
     """Run inference over a dataset, returning per-image targets, preds, confidences, paths."""
     loader = DataLoader(
         dataset,
@@ -90,7 +91,7 @@ def run_inference(model, dataset, batch_size: int, device: torch.device):
         for images, labels in loader:
             images = images.to(device)
             outputs = model(images)
-            probs = torch.softmax(outputs, dim=1)
+            probs = logits_to_probs(outputs, loss_fn)
             confs, preds = probs.max(dim=1)
 
             n = len(labels)
@@ -222,16 +223,22 @@ def main():
     class_names = dataset.classes
     print(f"[Audit] Classes: {class_names}  |  Images: {len(dataset)}")
 
+    loss_fn = options["model"].get("loss_fn", "cross_entropy")
     batch_size = options["data"].get("batch_size", 32)
     print(f"[Audit] Running inference (batch_size={batch_size}) ...")
-    targets, preds, confs, paths = run_inference(model, dataset, batch_size, device)
+    targets, preds, confs, paths = run_inference(model, dataset, batch_size, device,
+                                                 loss_fn=loss_fn)
 
     output_dir = args.output.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"[Audit] Copying misclassified images to {output_dir} ...")
-    bucket_counts = copy_misclassified(targets, preds, confs, paths, class_names, output_dir)
+    bucket_counts = copy_misclassified(
+        targets, preds, confs, paths, class_names, output_dir
+    )
 
-    summary = build_summary(args.split, results_dir, class_names, targets, preds, bucket_counts)
+    summary = build_summary(
+        args.split, results_dir, class_names, targets, preds, bucket_counts
+    )
     print()
     print(summary)
 

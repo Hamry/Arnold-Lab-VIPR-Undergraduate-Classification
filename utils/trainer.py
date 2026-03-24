@@ -44,6 +44,67 @@ from .visualization import (
 
 
 # ---------------------------------------------------------------------------
+# Loss Function Helpers
+# ---------------------------------------------------------------------------
+
+
+def build_criterion(loss_fn):
+    """
+    Construct a loss criterion from a string identifier.
+
+    Args:
+        loss_fn: One of 'cross_entropy', 'bce_sigmoid'
+
+    Returns:
+        nn.Module: The loss criterion
+    """
+    if loss_fn == "cross_entropy":
+        return nn.CrossEntropyLoss()
+    elif loss_fn == "bce_sigmoid":
+        return nn.BCEWithLogitsLoss()
+    else:
+        raise ValueError(
+            f"Unknown loss_fn: {loss_fn!r}. Supported values: 'cross_entropy', 'bce_sigmoid'."
+        )
+
+
+def prepare_targets_for_loss(targets, num_classes, loss_fn):
+    """
+    Convert integer class indices to the format required by the criterion.
+
+    CrossEntropyLoss expects a LongTensor of class indices [B].
+    BCEWithLogitsLoss expects a float one-hot tensor [B, num_classes].
+
+    Args:
+        targets: LongTensor of class indices [B]
+        num_classes: Total number of classes
+        loss_fn: Loss function identifier string
+
+    Returns:
+        Tensor in the correct dtype/shape for the criterion
+    """
+    if loss_fn == "bce_sigmoid":
+        return nn.functional.one_hot(targets, num_classes).float()
+    return targets
+
+
+def logits_to_probs(outputs, loss_fn):
+    """
+    Convert raw model logits to class probabilities.
+
+    Args:
+        outputs: Raw logits [B, num_classes]
+        loss_fn: Loss function identifier string
+
+    Returns:
+        Tensor of probabilities [B, num_classes]
+    """
+    if loss_fn == "bce_sigmoid":
+        return torch.sigmoid(outputs)
+    return torch.softmax(outputs, dim=1)
+
+
+# ---------------------------------------------------------------------------
 # Reproducibility
 # ---------------------------------------------------------------------------
 
@@ -377,7 +438,8 @@ def compute_per_class_metrics(targets, predictions, num_classes):
 # ---------------------------------------------------------------------------
 
 
-def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, device):
+def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, device,
+                    loss_fn="cross_entropy"):
     """
     Train for one epoch with mixed precision.
 
@@ -394,7 +456,8 @@ def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, devi
 
         with autocast("cuda"):
             outputs = model(inputs)
-            loss = criterion(outputs, targets)
+            targets_for_loss = prepare_targets_for_loss(targets, outputs.size(1), loss_fn)
+            loss = criterion(outputs, targets_for_loss)
 
         scaler.scale(loss).backward()
         scaler.step(optimizer)
@@ -408,7 +471,7 @@ def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, devi
     return total_loss / len(loader)
 
 
-def evaluate(model, loader, criterion, device):
+def evaluate(model, loader, criterion, device, loss_fn="cross_entropy"):
     """
     Evaluate model on a dataloader.
 
@@ -426,7 +489,8 @@ def evaluate(model, loader, criterion, device):
 
             with autocast("cuda"):
                 outputs = model(inputs)
-                loss = criterion(outputs, targets)
+                targets_for_loss = prepare_targets_for_loss(targets, outputs.size(1), loss_fn)
+                loss = criterion(outputs, targets_for_loss)
 
             top1 = compute_accuracy(outputs, targets)
 
@@ -440,7 +504,7 @@ def evaluate(model, loader, criterion, device):
     }
 
 
-def evaluate_with_predictions(model, loader, device):
+def evaluate_with_predictions(model, loader, device, loss_fn="cross_entropy"):
     """
     Evaluate model and collect all predictions for confusion matrix.
 
@@ -448,6 +512,7 @@ def evaluate_with_predictions(model, loader, device):
         model: The model to evaluate
         loader: DataLoader for evaluation
         device: Device to run on
+        loss_fn: Loss function identifier (unused here, kept for signature consistency)
 
     Returns:
         tuple: (all_targets, all_predictions) as lists
@@ -470,7 +535,7 @@ def evaluate_with_predictions(model, loader, device):
     return all_targets, all_predictions
 
 
-def evaluate_full(model, loader, criterion, device, class_names):
+def evaluate_full(model, loader, criterion, device, class_names, loss_fn="cross_entropy"):
     """
     Evaluate model with full per-class and macro metrics in a single pass.
 
@@ -484,6 +549,7 @@ def evaluate_full(model, loader, criterion, device, class_names):
         criterion: Loss function
         device: Device to run on
         class_names: List of class name strings (from dataset.classes)
+        loss_fn: Loss function identifier string
 
     Returns:
         dict with keys:
@@ -507,7 +573,8 @@ def evaluate_full(model, loader, criterion, device, class_names):
 
             with autocast("cuda"):
                 outputs = model(inputs)
-                loss = criterion(outputs, targets)
+                targets_for_loss = prepare_targets_for_loss(targets, outputs.size(1), loss_fn)
+                loss = criterion(outputs, targets_for_loss)
 
             _, predicted = outputs.max(1)
             total_loss += loss.item()
@@ -872,7 +939,8 @@ def train_model(options, trial=None, results_dir_override=None):
 
     # Training components
     dynamic_unfreeze_opts = options["training"].get("dynamic_unfreeze")
-    criterion = nn.CrossEntropyLoss()
+    loss_fn = options["model"].get("loss_fn", "cross_entropy")
+    criterion = build_criterion(loss_fn)
     optimizer = create_optimizer(
         model, options, backbone_name,
         dynamic_unfreeze_mode=bool(dynamic_unfreeze_opts)
@@ -927,10 +995,12 @@ def train_model(options, trial=None, results_dir_override=None):
             print(f"  Trainable: {trainable:,} / {total:,}\n")
 
         train_loss = train_one_epoch(
-            model, train_loader, criterion, optimizer, scheduler, scaler, device
+            model, train_loader, criterion, optimizer, scheduler, scaler, device,
+            loss_fn=loss_fn
         )
 
-        val_metrics = evaluate_full(model, val_loader, criterion, device, class_names)
+        val_metrics = evaluate_full(model, val_loader, criterion, device, class_names,
+                                    loss_fn=loss_fn)
 
         # Dynamic plateau-triggered unfreezing
         if thaw_controller is not None:
@@ -991,7 +1061,8 @@ def train_model(options, trial=None, results_dir_override=None):
 
     # Load best model and evaluate on test set
     load_checkpoint(model, results_dir)
-    test_metrics = evaluate_full(model, test_loader, criterion, device, class_names)
+    test_metrics = evaluate_full(model, test_loader, criterion, device, class_names,
+                                 loss_fn=loss_fn)
 
     # Measure inference time
     input_size = options["data"]["input_size"]
@@ -1040,7 +1111,7 @@ def train_model(options, trial=None, results_dir_override=None):
 
         # Confusion matrix on test set
         all_targets, all_predictions = evaluate_with_predictions(
-            model, test_loader, device
+            model, test_loader, device, loss_fn=loss_fn
         )
         # Get class names from ImageFolder dataset
         class_names = getattr(test_loader.dataset, 'classes', None)

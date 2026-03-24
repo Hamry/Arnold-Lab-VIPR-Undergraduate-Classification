@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader, Dataset
 sys.path.insert(0, str(Path(__file__).parent))
 
 from utils.model_utils import load_model
-from utils.trainer import build_eval_transforms, load_checkpoint
+from utils.trainer import build_eval_transforms, load_checkpoint, logits_to_probs
 
 
 # ---------------------------------------------------------------------------
@@ -95,6 +95,7 @@ def filter_and_split_dataset(
     with open(config_path) as f:
         options = json.load(f)
 
+    loss_fn = options["model"].get("loss_fn", "cross_entropy")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Loading model ({options['model']['backbone']}) on {device} ...")
     model = load_model(options, num_classes=len(categories))
@@ -183,7 +184,7 @@ def filter_and_split_dataset(
             for images_batch, indices in loader:
                 images_batch = images_batch.to(device)
                 outputs = model(images_batch)
-                probs = torch.softmax(outputs, dim=1)
+                probs = logits_to_probs(outputs, loss_fn)
                 confs, preds = probs.max(dim=1)
                 for i, (pred, conf) in enumerate(
                     zip(preds.cpu().tolist(), confs.cpu().tolist())

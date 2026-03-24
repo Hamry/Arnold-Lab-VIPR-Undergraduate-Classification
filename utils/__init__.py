@@ -13,7 +13,13 @@ from .model_utils import (
     thaw_units,
     UnfreezeUnit,
 )
-from .trainer import train_model, DynamicThawController
+from .trainer import (
+    train_model,
+    DynamicThawController,
+    build_criterion,
+    prepare_targets_for_loss,
+    logits_to_probs,
+)
 from .visualization import (
     load_metrics,
     load_results,
