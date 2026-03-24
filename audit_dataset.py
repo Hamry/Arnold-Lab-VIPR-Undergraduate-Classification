@@ -84,6 +84,7 @@ def run_inference(model, dataset, batch_size: int, device: torch.device,
     all_preds = []
     all_confs = []
     all_paths = []
+    all_probs = []
 
     global_idx = 0
     model.eval()
@@ -102,15 +103,20 @@ def run_inference(model, dataset, batch_size: int, device: torch.device,
             all_preds.extend(preds.cpu().tolist())
             all_confs.extend(confs.cpu().tolist())
             all_paths.extend(batch_paths)
+            all_probs.extend(probs.cpu().tolist())
 
-    return all_targets, all_preds, all_confs, all_paths
+    return all_targets, all_preds, all_confs, all_paths, all_probs
 
 
-def copy_misclassified(targets, preds, confs, paths, class_names, output_dir: Path):
-    """Copy misclassified images into output_dir/{Correct}_as_{Guessed}/ folders."""
+def copy_misclassified(targets, preds, confs, paths, class_names, output_dir: Path, all_probs):
+    """Copy misclassified images into output_dir/{Correct}_as_{Guessed}/ folders.
+
+    For each image, a sidecar .txt file is written alongside it showing all class
+    probabilities sorted descending, so you can see how close each wrong call was.
+    """
     bucket_counts: dict[str, int] = {}
 
-    for target, pred, conf, img_path in zip(targets, preds, confs, paths):
+    for target, pred, conf, img_path, img_probs in zip(targets, preds, confs, paths, all_probs):
         if pred == target:
             continue
 
@@ -127,6 +133,12 @@ def copy_misclassified(targets, preds, confs, paths, class_names, output_dir: Pa
         dest = folder / dest_name
 
         shutil.copy2(img_path, dest)
+
+        scores_sorted = sorted(zip(class_names, img_probs), key=lambda x: -x[1])
+        dest.with_suffix(".txt").write_text(
+            "\n".join(f"{name}: {score:.4f}" for name, score in scores_sorted)
+        )
+
         bucket_counts[bucket] = bucket_counts.get(bucket, 0) + 1
 
     return bucket_counts
@@ -226,14 +238,14 @@ def main():
     loss_fn = options["model"].get("loss_fn", "cross_entropy")
     batch_size = options["data"].get("batch_size", 32)
     print(f"[Audit] Running inference (batch_size={batch_size}) ...")
-    targets, preds, confs, paths = run_inference(model, dataset, batch_size, device,
-                                                 loss_fn=loss_fn)
+    targets, preds, confs, paths, all_probs = run_inference(model, dataset, batch_size, device,
+                                                            loss_fn=loss_fn)
 
     output_dir = args.output.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     print(f"[Audit] Copying misclassified images to {output_dir} ...")
     bucket_counts = copy_misclassified(
-        targets, preds, confs, paths, class_names, output_dir
+        targets, preds, confs, paths, class_names, output_dir, all_probs
     )
 
     summary = build_summary(
