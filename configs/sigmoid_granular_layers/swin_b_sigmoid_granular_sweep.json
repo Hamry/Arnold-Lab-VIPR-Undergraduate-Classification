@@ -1,0 +1,46 @@
+{
+    "study_name": "sigmoid_granular/swin_b_sigmoid_frozen_granular",
+    "base_config_path": "configs/base_config_sigmoid/swin_b_sigmoid.json",
+    "n_trials": 50,
+    "timeout_hours": 24,
+    "pruning": {
+        "enabled": false
+    },
+    "cleanup": {
+        "keep_top_n": 5,
+        "cleanup_frequency": 10
+    },
+    "search_space": {
+        "training.learning_rate": {
+            "type": "log_float",
+            "low": 1e-4,
+            "high": 1e-2
+        },
+        "training.weight_decay": {
+            "type": "log_float",
+            "low": 1e-5,
+            "high": 1e-2
+        },
+        "augmentations.color_jitter": {
+            "type": "float",
+            "low": 0.0,
+            "high": 0.15
+        },
+        "augmentations.random_rotation": {
+            "type": "float",
+            "low": 0.0,
+            "high": 30.0
+        },
+        "model.classifier_hidden": {
+            "type": "hidden_layers",
+            "n_layers": [1, 2],
+            "size_low": 128,
+            "size_high": 2048
+        },
+        "model.dropout": {
+            "type": "float",
+            "low": 0.1,
+            "high": 0.5
+        }
+    }
+}

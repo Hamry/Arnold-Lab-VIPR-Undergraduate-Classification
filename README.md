@@ -18,6 +18,7 @@ A config-driven deep learning framework for benchmarking pretrained CNN/Transfor
 - [Dataset Format](#dataset-format)
 - [Results Structure](#results-structure)
 - [Dataset Audit Tool](#dataset-audit-tool)
+- [Sigmoid Granular Layer Sweeps](#sigmoid-granular-layer-sweeps)
 
 ---
 
@@ -474,6 +475,33 @@ See `configs/optuna/resnet152_gradual_unfreeze_sweep.json` for a working example
 | `float` | `low`, `high` | Float sampled on linear scale |
 | `int` | `low`, `high` | Integer in range [low, high] |
 | `categorical` | `choices` | Pick from list of discrete values |
+| `hidden_layers` | `n_layers`, `size_low`, `size_high` | Variable-depth MLP head search (see below) |
+
+##### `hidden_layers` Type
+
+Searches both the number of hidden layers and each layer's size as a continuous integer range. Replaces the hardcoded `categorical` list approach.
+
+```json
+"model.classifier_hidden": {
+    "type": "hidden_layers",
+    "n_layers": [1, 2],
+    "size_low": 128,
+    "size_high": 2048,
+    "size_step": 1,
+    "size_log": false,
+    "enforce_decreasing": false
+}
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `n_layers` | required | List of valid layer counts, e.g. `[1, 2]` |
+| `size_low` / `size_high` | required | Integer range for each layer size |
+| `size_step` | `1` | Quantize sizes to multiples of this value |
+| `size_log` | `false` | Sample sizes on log scale |
+| `enforce_decreasing` | `false` | Sort layer sizes descending (funnel architecture) |
+
+Optuna registers `n_layers` as categorical and each `layer_{i}_size` as an integer parameter. All layer sizes are always sampled (up to `max(n_layers)`) to avoid conditional-parameter issues with the TPE sampler; the result is then sliced to the sampled depth.
 
 ---
 
@@ -621,3 +649,28 @@ dataset_audit/
 ```
 
 Each misclassified image is copied into a `{CorrectClass}_as_{GuessedClass}/` folder. The filename is prefixed with a 4-digit basis-point confidence score so images can be sorted by model certainty.
+
+---
+
+## Sigmoid Granular Layer Sweeps
+
+A set of pre-built Optuna sweep experiments using `bce_sigmoid` loss with **fully frozen backbones** and the new `hidden_layers` search space (1–2 layers, sizes 128–2048).
+
+### Config locations
+
+| Directory | Contents |
+|---|---|
+| `configs/base_config_sigmoid/` | Base training configs for each backbone (sigmoid, frozen, new data path) |
+| `configs/sigmoid_granular_layers/` | Optuna sweep configs referencing the above |
+
+### Backbones covered
+
+alexnet, convnext_base, densenet201, efficientnet_b4, inception_v3, resnet152, swin_b, vgg16, vgg19, vit_l_16
+
+### Submit all jobs at once
+
+```bash
+bash submit_sigmoid_granular_sweeps.sh
+```
+
+Results land in `results/optuna_studies/sigmoid_granular/<backbone>_sigmoid_frozen_granular/`.
