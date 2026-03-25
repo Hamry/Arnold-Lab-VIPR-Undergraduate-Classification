@@ -37,7 +37,7 @@ module load cuDNN/8.4.1.50-CUDA-11.7.0
 # Activate virtual environment
 echo ""
 echo "Activating virtual environment..."
-source /scratch/hl98745/scratch_venv/bin/activate
+source /scratch/$USER/scratch_venv/bin/activate
 
 # Verify Python and PyTorch
 echo ""
