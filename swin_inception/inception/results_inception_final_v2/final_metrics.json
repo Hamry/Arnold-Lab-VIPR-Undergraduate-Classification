@@ -1,0 +1,19 @@
+{
+    "f1_macro": 0.902276321320169,
+    "accuracy": 0.9124087591240876,
+    "f1_weighted": 0.9116837172902233,
+    "precision_macro": 0.9045748087041938,
+    "recall_macro": 0.9016053637678239,
+    "f1_Blurry": 0.8293838862559242,
+    "precision_Blurry": 0.875,
+    "recall_Blurry": 0.7882882882882883,
+    "f1_Good": 0.9462102689486552,
+    "precision_Good": 0.937046004842615,
+    "recall_Good": 0.9555555555555556,
+    "f1_Opaque": 0.8761467889908257,
+    "precision_Opaque": 0.8488888888888889,
+    "recall_Opaque": 0.9052132701421801,
+    "f1_Yellow": 0.9573643410852714,
+    "precision_Yellow": 0.9573643410852714,
+    "recall_Yellow": 0.9573643410852714
+}
