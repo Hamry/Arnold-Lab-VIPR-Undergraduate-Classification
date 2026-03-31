@@ -1,0 +1,124 @@
+======================================================================
+VIPR CLASSIFICATION - BACKBONE BENCHMARK
+======================================================================
+Job started on b8-2 at Sun Mar  8 18:28:08 EDT 2026
+Job ID: 43350780
+======================================================================
+
+GPU Information:
+Sun Mar  8 18:28:08 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 570.124.06             Driver Version: 570.124.06     CUDA Version: 12.8     |
+|-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA A100-SXM4-80GB          On  |   00000000:C1:00.0 Off |                    0 |
+| N/A   22C    P0             59W /  500W |       1MiB /  81920MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+                                                                                         
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+
+Loading modules...
+
+Activating virtual environment...
+
+Python: /scratch/vk44347/workDir/scratch_venv/bin/python
+PyTorch version: 2.0.1+cu117
+CUDA available: True
+
+======================================================================
+Starting training with config: configs/vgg16.json
+======================================================================
+
+
+============================================================
+Starting Experiment: vgg16_frozen
+============================================================
+
+[Device] cuda
+[Data] Train: 3840, Val: 1096, Test: 553
+[Model] vgg16: 138,459,972 params, 123,745,284 trainable
+Epoch   1/50 | Train Loss: 0.7748 | Val Loss: 0.9279 | Val Acc: 64.82% | LR: 0.000100 *
+Epoch   2/50 | Train Loss: 0.5310 | Val Loss: 0.6896 | Val Acc: 73.39% | LR: 0.000100 *
+Epoch   3/50 | Train Loss: 0.5123 | Val Loss: 0.6380 | Val Acc: 74.82% | LR: 0.000099 *
+Epoch   4/50 | Train Loss: 0.4421 | Val Loss: 0.5613 | Val Acc: 77.86% | LR: 0.000098 *
+Epoch   5/50 | Train Loss: 0.4266 | Val Loss: 0.5488 | Val Acc: 79.64% | LR: 0.000098 *
+Epoch   6/50 | Train Loss: 0.3925 | Val Loss: 0.5598 | Val Acc: 78.48% | LR: 0.000096
+Epoch   7/50 | Train Loss: 0.4031 | Val Loss: 0.5709 | Val Acc: 77.32% | LR: 0.000095
+Epoch   8/50 | Train Loss: 0.3502 | Val Loss: 0.5187 | Val Acc: 79.91% | LR: 0.000094 *
+Epoch   9/50 | Train Loss: 0.3581 | Val Loss: 0.5280 | Val Acc: 80.09% | LR: 0.000092 *
+Epoch  10/50 | Train Loss: 0.3389 | Val Loss: 0.5619 | Val Acc: 79.20% | LR: 0.000090
+Epoch  11/50 | Train Loss: 0.3357 | Val Loss: 0.5150 | Val Acc: 79.73% | LR: 0.000089
+Epoch  12/50 | Train Loss: 0.3094 | Val Loss: 0.5727 | Val Acc: 79.82% | LR: 0.000086
+Epoch  13/50 | Train Loss: 0.3174 | Val Loss: 0.5223 | Val Acc: 80.71% | LR: 0.000084 *
+Epoch  14/50 | Train Loss: 0.2881 | Val Loss: 0.5475 | Val Acc: 78.66% | LR: 0.000082
+Epoch  15/50 | Train Loss: 0.2962 | Val Loss: 0.5302 | Val Acc: 80.00% | LR: 0.000079
+Epoch  16/50 | Train Loss: 0.2654 | Val Loss: 0.5996 | Val Acc: 79.46% | LR: 0.000077
+Epoch  17/50 | Train Loss: 0.2772 | Val Loss: 0.5446 | Val Acc: 80.09% | LR: 0.000074
+Epoch  18/50 | Train Loss: 0.2554 | Val Loss: 0.5663 | Val Acc: 79.11% | LR: 0.000071
+Epoch  19/50 | Train Loss: 0.2476 | Val Loss: 0.6164 | Val Acc: 78.48% | LR: 0.000068
+Epoch  20/50 | Train Loss: 0.2485 | Val Loss: 0.5775 | Val Acc: 79.29% | LR: 0.000065
+Epoch  21/50 | Train Loss: 0.2344 | Val Loss: 0.6245 | Val Acc: 79.20% | LR: 0.000062
+Epoch  22/50 | Train Loss: 0.2266 | Val Loss: 0.6250 | Val Acc: 80.36% | LR: 0.000059
+Epoch  23/50 | Train Loss: 0.2182 | Val Loss: 0.6402 | Val Acc: 79.64% | LR: 0.000056
+Epoch  24/50 | Train Loss: 0.2088 | Val Loss: 0.6261 | Val Acc: 79.55% | LR: 0.000053
+Epoch  25/50 | Train Loss: 0.2086 | Val Loss: 0.6100 | Val Acc: 80.71% | LR: 0.000050
+Epoch  26/50 | Train Loss: 0.1982 | Val Loss: 0.6520 | Val Acc: 79.82% | LR: 0.000047
+Epoch  27/50 | Train Loss: 0.1888 | Val Loss: 0.6226 | Val Acc: 80.62% | LR: 0.000044
+Epoch  28/50 | Train Loss: 0.1896 | Val Loss: 0.6432 | Val Acc: 80.62% | LR: 0.000041
+Epoch  29/50 | Train Loss: 0.1900 | Val Loss: 0.6025 | Val Acc: 81.70% | LR: 0.000038 *
+Epoch  30/50 | Train Loss: 0.1782 | Val Loss: 0.6020 | Val Acc: 81.96% | LR: 0.000035 *
+Epoch  31/50 | Train Loss: 0.1710 | Val Loss: 0.6224 | Val Acc: 81.16% | LR: 0.000032
+Epoch  32/50 | Train Loss: 0.1654 | Val Loss: 0.6240 | Val Acc: 81.96% | LR: 0.000029
+Epoch  33/50 | Train Loss: 0.1521 | Val Loss: 0.6559 | Val Acc: 80.80% | LR: 0.000026
+Epoch  34/50 | Train Loss: 0.1413 | Val Loss: 0.7229 | Val Acc: 79.91% | LR: 0.000023
+Epoch  35/50 | Train Loss: 0.1426 | Val Loss: 0.7038 | Val Acc: 81.61% | LR: 0.000021
+Epoch  36/50 | Train Loss: 0.1502 | Val Loss: 0.7037 | Val Acc: 81.34% | LR: 0.000018
+Epoch  37/50 | Train Loss: 0.1393 | Val Loss: 0.7084 | Val Acc: 81.52% | LR: 0.000016
+Epoch  38/50 | Train Loss: 0.1377 | Val Loss: 0.7002 | Val Acc: 81.70% | LR: 0.000014
+Epoch  39/50 | Train Loss: 0.1392 | Val Loss: 0.6746 | Val Acc: 81.79% | LR: 0.000011
+Epoch  40/50 | Train Loss: 0.1347 | Val Loss: 0.6793 | Val Acc: 81.70% | LR: 0.000010
+Epoch  41/50 | Train Loss: 0.1388 | Val Loss: 0.6769 | Val Acc: 81.88% | LR: 0.000008
+Epoch  42/50 | Train Loss: 0.1252 | Val Loss: 0.6780 | Val Acc: 81.70% | LR: 0.000006
+Epoch  43/50 | Train Loss: 0.1338 | Val Loss: 0.6789 | Val Acc: 81.79% | LR: 0.000005
+Epoch  44/50 | Train Loss: 0.1275 | Val Loss: 0.6758 | Val Acc: 81.61% | LR: 0.000004
+Epoch  45/50 | Train Loss: 0.1165 | Val Loss: 0.6787 | Val Acc: 82.32% | LR: 0.000002 *
+Epoch  46/50 | Train Loss: 0.1186 | Val Loss: 0.6794 | Val Acc: 81.70% | LR: 0.000002
+Epoch  47/50 | Train Loss: 0.1333 | Val Loss: 0.6783 | Val Acc: 81.61% | LR: 0.000001
+Epoch  48/50 | Train Loss: 0.1173 | Val Loss: 0.6780 | Val Acc: 81.52% | LR: 0.000000
+Epoch  49/50 | Train Loss: 0.1111 | Val Loss: 0.6786 | Val Acc: 81.61% | LR: 0.000000
+Epoch  50/50 | Train Loss: 0.1170 | Val Loss: 0.6786 | Val Acc: 81.61% | LR: 0.000000
+
+============================================================
+FINAL RESULTS
+============================================================
+Best Validation Accuracy: 82.32%
+Best Epoch: 45
+Test Accuracy: 83.58%
+Inference Time: 1.33 ms
+Total Parameters: 138,459,972
+Trainable Parameters: 123,745,284
+============================================================
+
+[Visualization] Generating training plots...
+Saved: results/vgg16_frozen/loss_curves.png
+Saved: results/vgg16_frozen/accuracy_curves.png
+Saved: results/vgg16_frozen/learning_rate.png
+Saved: results/vgg16_frozen/summary.png
+Saved: results/vgg16_frozen/confusion_matrix.png
+[Visualization] All plots saved to results/vgg16_frozen
+
+Results saved to: results/vgg16_frozen/
+
+======================================================================
+Job finished at Sun Mar  8 18:40:29 EDT 2026
+======================================================================

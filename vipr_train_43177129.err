@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/scratch/vk44347/workDir/Arnold-Lab-VIPR-Undergraduate-Classification/run_experiment.py", line 31, in <module>
+    main()
+  File "/scratch/vk44347/workDir/Arnold-Lab-VIPR-Undergraduate-Classification/run_experiment.py", line 25, in main
+    results = train_model(options)
+  File "/scratch/vk44347/workDir/Arnold-Lab-VIPR-Undergraduate-Classification/utils/trainer.py", line 665, in train_model
+    train_loss = train_one_epoch(
+  File "/scratch/vk44347/workDir/Arnold-Lab-VIPR-Undergraduate-Classification/utils/trainer.py", line 329, in train_one_epoch
+    with autocast("cuda"):
+  File "/scratch/vk44347/workDir/scratch_venv/lib/python3.10/site-packages/torch/cuda/amp/autocast_mode.py", line 30, in __enter__
+    return super().__enter__()
+  File "/scratch/vk44347/workDir/scratch_venv/lib/python3.10/site-packages/torch/amp/autocast_mode.py", line 265, in __enter__
+    torch.set_autocast_enabled(self._enabled)
+TypeError: enabled must be a bool (got str)

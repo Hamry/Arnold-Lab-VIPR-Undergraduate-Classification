@@ -1,0 +1,18 @@
+Traceback (most recent call last):
+  File "/scratch/vk44347/workDir/Arnold-Lab-VIPR-Undergraduate-Classification/run_experiment.py", line 31, in <module>
+    main()
+  File "/scratch/vk44347/workDir/Arnold-Lab-VIPR-Undergraduate-Classification/run_experiment.py", line 25, in main
+    results = train_model(options)
+  File "/scratch/vk44347/workDir/Arnold-Lab-VIPR-Undergraduate-Classification/utils/trainer.py", line 620, in train_model
+    train_loader, val_loader, test_loader = create_dataloaders(options)
+  File "/scratch/vk44347/workDir/Arnold-Lab-VIPR-Undergraduate-Classification/utils/trainer.py", line 153, in create_dataloaders
+    train_dataset = datasets.ImageFolder(data_path / "train", train_transform)
+  File "/scratch/vk44347/workDir/scratch_venv/lib/python3.10/site-packages/torchvision/datasets/folder.py", line 309, in __init__
+    super().__init__(
+  File "/scratch/vk44347/workDir/scratch_venv/lib/python3.10/site-packages/torchvision/datasets/folder.py", line 144, in __init__
+    classes, class_to_idx = self.find_classes(self.root)
+  File "/scratch/vk44347/workDir/scratch_venv/lib/python3.10/site-packages/torchvision/datasets/folder.py", line 218, in find_classes
+    return find_classes(directory)
+  File "/scratch/vk44347/workDir/scratch_venv/lib/python3.10/site-packages/torchvision/datasets/folder.py", line 40, in find_classes
+    classes = sorted(entry.name for entry in os.scandir(directory) if entry.is_dir())
+FileNotFoundError: [Errno 2] No such file or directory: '/scratch/vk44347/workDir/data/final_split_dataset/train'

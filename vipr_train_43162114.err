@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/scratch/vk44347/workDir/Arnold-Lab-VIPR-Undergraduate-Classification/run_experiment.py", line 31, in <module>
+    main()
+  File "/scratch/vk44347/workDir/Arnold-Lab-VIPR-Undergraduate-Classification/run_experiment.py", line 22, in main
+    with open(config_path, "r") as f:
+FileNotFoundError: [Errno 2] No such file or directory: 'configs/json.net'

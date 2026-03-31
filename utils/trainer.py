@@ -18,8 +18,13 @@ matplotlib.use('Agg')  # Non-interactive backend for SLURM/headless
 
 import torch
 import torch.nn as nn
-from torch.amp.grad_scaler import GradScaler
-from torch.amp.autocast_mode import autocast
+# AMP imports (compatible across PyTorch versions)
+try:
+    # Newer PyTorch
+    from torch.amp import GradScaler, autocast
+except Exception:
+    # Older / widely supported
+    from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
@@ -110,6 +115,11 @@ def build_train_transforms(options):
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ]
     )
+
+    # Random erasing — must come after ToTensor (operates on tensors)
+    erasing_prob = aug.get("random_erasing", 0)
+    if erasing_prob > 0:
+        transform_list.append(transforms.RandomErasing(p=erasing_prob))
 
     return transforms.Compose(transform_list)
 
@@ -222,6 +232,27 @@ def create_optimizer(model, options, backbone_name=None, dynamic_unfreeze_mode=F
         param_groups = [
             {'params': list(classifier.parameters()), 'lr': lr, 'name': 'classifier'},
         ]
+    elif backbone_name and train_opts.get("backbone_lr_multiplier") is not None:
+        # Discriminative LR: backbone trainable blocks at a fraction of classifier LR.
+        # Only includes requires_grad=True params (partial fine-tune setup).
+        backbone_lr_multiplier = train_opts["backbone_lr_multiplier"]
+        classifier_attr = _get_classifier_attr(backbone_name)
+        classifier = getattr(model, classifier_attr)
+        classifier_param_ids = {id(p) for p in classifier.parameters()}
+
+        classifier_params = [
+            p for p in model.parameters()
+            if p.requires_grad and id(p) in classifier_param_ids
+        ]
+        backbone_params = [
+            p for p in model.parameters()
+            if p.requires_grad and id(p) not in classifier_param_ids
+        ]
+
+        param_groups = [
+            {'params': classifier_params, 'lr': lr, 'name': 'classifier'},
+            {'params': backbone_params, 'lr': lr * backbone_lr_multiplier, 'name': 'backbone'},
+        ]
     elif backbone_name and thaw_schedule:
         # Use discriminative LR if thaw_schedule is configured
         backbone_lr_ratio = train_opts.get("backbone_lr_ratio", 0.1)
@@ -259,17 +290,36 @@ def create_optimizer(model, options, backbone_name=None, dynamic_unfreeze_mode=F
 
 
 def create_scheduler(optimizer, options, steps_per_epoch):
-    """Create learning rate scheduler from config."""
+    """Create learning rate scheduler from config.
+
+    Supports an optional linear warmup phase before the main schedule.
+    Set ``warmup_epochs`` in the training config to enable it.
+    """
     train_opts = options["training"]
     scheduler_name = train_opts.get("scheduler")
     epochs = train_opts["epochs"]
+    warmup_epochs = train_opts.get("warmup_epochs", 0)
 
     if scheduler_name is None:
         return None
     elif scheduler_name == "cosine":
-        return torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=epochs * steps_per_epoch
+        cosine_epochs = max(1, epochs - warmup_epochs)
+        cosine = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=cosine_epochs * steps_per_epoch
         )
+        if warmup_epochs > 0:
+            warmup = torch.optim.lr_scheduler.LinearLR(
+                optimizer,
+                start_factor=0.1,
+                end_factor=1.0,
+                total_iters=warmup_epochs * steps_per_epoch,
+            )
+            return torch.optim.lr_scheduler.SequentialLR(
+                optimizer,
+                schedulers=[warmup, cosine],
+                milestones=[warmup_epochs * steps_per_epoch],
+            )
+        return cosine
     elif scheduler_name == "step":
         return torch.optim.lr_scheduler.StepLR(
             optimizer, step_size=epochs // 3, gamma=0.1
@@ -385,7 +435,7 @@ def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, devi
 
         optimizer.zero_grad()
 
-        with autocast("cuda"):
+        with autocast(enabled=(device.type == "cuda")):
             outputs = model(inputs)
             loss = criterion(outputs, targets)
 
@@ -417,7 +467,7 @@ def evaluate(model, loader, criterion, device):
         for inputs, targets in loader:
             inputs, targets = inputs.to(device), targets.to(device)
 
-            with autocast("cuda"):
+            with autocast(enabled=(device.type == "cuda")):
                 outputs = model(inputs)
                 loss = criterion(outputs, targets)
 
@@ -453,7 +503,7 @@ def evaluate_with_predictions(model, loader, device):
         for inputs, targets in loader:
             inputs, targets = inputs.to(device), targets.to(device)
 
-            with autocast("cuda"):
+            with autocast(enabled=(device.type == "cuda")):
                 outputs = model(inputs)
 
             _, predicted = outputs.max(1)
@@ -498,7 +548,7 @@ def evaluate_full(model, loader, criterion, device, class_names):
         for inputs, targets in loader:
             inputs, targets = inputs.to(device), targets.to(device)
 
-            with autocast("cuda"):
+            with autocast(enabled=(device.type == "cuda")):
                 outputs = model(inputs)
                 loss = criterion(outputs, targets)
 
@@ -865,13 +915,29 @@ def train_model(options, trial=None, results_dir_override=None):
 
     # Training components
     dynamic_unfreeze_opts = options["training"].get("dynamic_unfreeze")
-    criterion = nn.CrossEntropyLoss()
+
+    # Class weights (balanced mode: n_samples / (n_classes * class_count))
+    class_weight_tensor = None
+    if options["training"].get("class_weights") == "balanced":
+        from collections import Counter
+        targets = train_loader.dataset.targets
+        counts = Counter(targets)
+        n_samples = len(targets)
+        n_classes = len(counts)
+        weight_values = [n_samples / (n_classes * counts[i]) for i in range(n_classes)]
+        class_weight_tensor = torch.tensor(weight_values, dtype=torch.float).to(device)
+        print(f"[Loss] Balanced class weights: { {i: f'{w:.3f}' for i, w in enumerate(weight_values)} }")
+
+    label_smoothing = options["training"].get("label_smoothing", 0.0)
+    criterion = nn.CrossEntropyLoss(weight=class_weight_tensor, label_smoothing=label_smoothing)
+    if label_smoothing > 0:
+        print(f"[Loss] Label smoothing: {label_smoothing}")
     optimizer = create_optimizer(
         model, options, backbone_name,
         dynamic_unfreeze_mode=bool(dynamic_unfreeze_opts)
     )
     scheduler = create_scheduler(optimizer, options, len(train_loader))
-    scaler = GradScaler("cuda")
+    scaler = GradScaler(enabled = (device.type == "cuda"))
 
     # Early stopping
     early_stopping = EarlyStopping(patience=patience)
