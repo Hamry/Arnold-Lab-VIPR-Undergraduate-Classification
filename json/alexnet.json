@@ -1,7 +1,7 @@
 {
-    "experiment_name": "vgg16_frozen",
+    "experiment_name": "alexnet_frozen",
     "model": {
-        "backbone": "vgg16",
+        "backbone": "alexnet",
         "pretrained": true,
         "freeze_backbone": true,
         "classifier_hidden": [1024],
@@ -11,7 +11,7 @@
         "path": "/scratch/vk44347/workDir/data",
         "input_size": 224,
         "batch_size": 32,
-        "num_workers": 4
+        "num_workers": 8
     },
     "augmentations": {
         "horizontal_flip": true,
@@ -21,7 +21,7 @@
         "random_crop_scale": [0.8, 1.0]
     },
     "training": {
-        "epochs": 50,
+        "epochs": 100,
         "learning_rate": 0.0001,
         "optimizer": "adamw",
         "weight_decay": 0.01,

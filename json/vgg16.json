@@ -1,11 +1,13 @@
 {
-    "experiment_name": "alexnet_frozen",
+    "experiment_name": "vgg16_frozen",
     "model": {
-        "backbone": "alexnet",
+        "backbone": "vgg16",
         "pretrained": true,
-        "freeze_backbone": true,
-        "classifier_hidden": [1024],
-        "dropout": 0.2
+        "freeze_backbone": false,
+        "trainable_blocks": ["block4", "block5"],
+        "classifier_hidden": [1024, 512],
+        "dropout": 0.5,
+	"num_workers": 4
     },
     "data": {
         "path": "/scratch/vk44347/workDir/data",
@@ -17,16 +19,22 @@
         "horizontal_flip": true,
         "vertical_flip": false,
         "random_rotation": 15,
-        "color_jitter": 0.1,
+        "color_jitter": 0.05,
+	"random_erasing": 0.2,
         "random_crop_scale": [0.8, 1.0]
     },
     "training": {
-        "epochs": 50,
+        "epochs": 100,
         "learning_rate": 0.0001,
+	"backbone_lr_multiplier": 0.1,
         "optimizer": "adamw",
         "weight_decay": 0.01,
         "scheduler": "cosine",
+	"warmup_epochs": 5,
+	"class_weights": "balanced",
+	"label_smoothing": 0.1,
         "seed": 42,
-        "early_stopping_patience": 20
+        "early_stopping_patience": 20,
+	"metrics": ["accuracy", "f1_macro", "f1_per_class"]
     }
 }

@@ -223,6 +223,78 @@ def attach_classifier(model, backbone_name, classifier):
 # Freezing Logic
 # ---------------------------------------------------------------------------
 
+# Maps human-readable block names to their feature-layer index ranges in VGG.
+# VGG16/VGG19 both use a flat `features` Sequential; blocks are separated by
+# MaxPool2d layers.  Ranges are inclusive of the pooling layer that ends each block.
+_VGG_BLOCK_RANGES = {
+    "vgg16": {
+        "block1": range(0, 5),    # conv1_1, conv1_2, pool1
+        "block2": range(5, 10),   # conv2_1, conv2_2, pool2
+        "block3": range(10, 17),  # conv3_1..conv3_3, pool3
+        "block4": range(17, 24),  # conv4_1..conv4_3, pool4
+        "block5": range(24, 31),  # conv5_1..conv5_3, pool5
+    },
+    "vgg19": {
+        "block1": range(0, 5),
+        "block2": range(5, 10),
+        "block3": range(10, 19),  # 4 conv layers
+        "block4": range(19, 28),
+        "block5": range(28, 37),
+    },
+}
+
+
+def freeze_backbone_partial(model, backbone_name, trainable_blocks):
+    """
+    Freeze the entire backbone then selectively unfreeze the specified blocks.
+
+    The classifier head is always left trainable.  Use this when
+    ``freeze_backbone`` is False but ``trainable_blocks`` is provided —
+    i.e. a partial fine-tune rather than full-freeze or full-unfreeze.
+
+    Supports VGG16/VGG19 (block1..block5) and falls back to a
+    named-children scan for other architectures.
+
+    Args:
+        model: The full model with classifier attached.
+        backbone_name: Registry key, e.g. "vgg16".
+        trainable_blocks: List of block name strings, e.g. ["block4", "block5"].
+    """
+    classifier_attr = _get_classifier_attr(backbone_name)
+
+    # 1. Freeze everything
+    for param in model.parameters():
+        param.requires_grad = False
+
+    # 2. Always unfreeze the classifier
+    for param in getattr(model, classifier_attr).parameters():
+        param.requires_grad = True
+
+    # 3. Unfreeze the requested backbone blocks
+    if backbone_name in _VGG_BLOCK_RANGES:
+        block_map = _VGG_BLOCK_RANGES[backbone_name]
+        for block_name in trainable_blocks:
+            if block_name not in block_map:
+                raise ValueError(
+                    f"Unknown block '{block_name}' for {backbone_name}. "
+                    f"Valid blocks: {list(block_map.keys())}"
+                )
+            for idx in block_map[block_name]:
+                for param in model.features[idx].parameters():
+                    param.requires_grad = True
+    else:
+        # Generic fallback: match block names against named children
+        available = {name: mod for name, mod in model.named_children()
+                     if name != classifier_attr}
+        for block_name in trainable_blocks:
+            if block_name not in available:
+                raise ValueError(
+                    f"Block '{block_name}' not found in {backbone_name}. "
+                    f"Available: {list(available.keys())}"
+                )
+            for param in available[block_name].parameters():
+                param.requires_grad = True
+
 
 def freeze_backbone(model, backbone_name):
     """
@@ -555,7 +627,7 @@ def thaw_backbone_percentage(model, backbone_name, percentage):
 # ---------------------------------------------------------------------------
 
 
-def load_model(options, num_classes=4):
+def load_model(options):
     """
     Build a complete model from configuration.
 
@@ -564,15 +636,20 @@ def load_model(options, num_classes=4):
             - backbone: str, architecture name
             - pretrained: bool, load ImageNet weights
             - freeze_backbone: bool, freeze backbone parameters
+            - trainable_blocks: list[str], optional — if provided alongside
+              freeze_backbone=False, freezes all backbone blocks EXCEPT these.
+              e.g. ["block4", "block5"] for partial VGG fine-tuning.
             - classifier_hidden: list[int], hidden layer sizes
             - dropout: float, dropout probability
-        num_classes: Number of output classes (default: 4)
+            - num_classes: int, number of output classes (default: 4)
 
     Returns:
         nn.Module: Complete model ready for training
     """
     model_opts = options["model"]
     backbone_name = model_opts["backbone"]
+    num_classes = model_opts.get("num_classes", 4)
+    trainable_blocks = model_opts.get("trainable_blocks")
 
     backbone = _load_backbone(backbone_name, model_opts["pretrained"])
     feature_dim = get_feature_dim(backbone, backbone_name)
@@ -586,7 +663,13 @@ def load_model(options, num_classes=4):
     attach_classifier(backbone, backbone_name, classifier)
 
     if model_opts["freeze_backbone"]:
+        # Full freeze: only classifier trains
         freeze_backbone(backbone, backbone_name)
+    elif trainable_blocks:
+        # Partial fine-tune: freeze all backbone blocks except the listed ones
+        freeze_backbone_partial(backbone, backbone_name, trainable_blocks)
+        print(f"[Model] Partial fine-tune — trainable blocks: {trainable_blocks}")
+    # else: freeze_backbone=False, no trainable_blocks → all params train
 
     total, trainable = count_parameters(backbone)
     print(f"[Model] {backbone_name}: {total:,} params, {trainable:,} trainable")
