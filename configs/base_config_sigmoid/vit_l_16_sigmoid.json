@@ -1,16 +1,17 @@
 {
-    "experiment_name": "densenet201_frozen",
+    "experiment_name": "vit_l_16_sigmoid_frozen",
     "model": {
-        "backbone": "densenet201",
+        "backbone": "vit_l_16",
         "pretrained": true,
         "freeze_backbone": true,
         "classifier_hidden": [1024],
-        "dropout": 0.2
+        "dropout": 0.2,
+        "loss_fn": "bce_sigmoid"
     },
     "data": {
-        "path": "/scratch/hl98745/category_balanced_dataset",
+        "path": "/work/omlpa/HL98745/data/single_label_category_balanced_filtered",
         "input_size": 224,
-        "batch_size": 32,
+        "batch_size": 16,
         "num_workers": 8
     },
     "augmentations": {

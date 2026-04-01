@@ -1,9 +1,8 @@
 """
-Unit tests for the Resolution Probe and Dynamic Unfreezing system.
+Unit tests for the Dynamic Unfreezing system.
 
 Covers:
-    - get_resolution_probe()      : forward-hook stage detection
-    - get_unfreeze_units()        : CNN path + isotropic ViT path
+    - get_unfreeze_units()        : registry-based block partitioning
     - thaw_units()                : requires_grad toggling
     - DynamicThawController       : plateau detection, LR decay, edge cases
     - create_optimizer() dynamic mode : classifier-only startup
@@ -21,7 +20,6 @@ import torch.nn as nn
 from torchvision import models
 
 from utils.model_utils import (
-    get_resolution_probe,
     get_unfreeze_units,
     thaw_units,
     UnfreezeUnit,
@@ -37,42 +35,6 @@ from utils.trainer import DynamicThawController, create_optimizer
 # ---------------------------------------------------------------------------
 
 
-class TinyCNN(nn.Module):
-    """
-    Minimal CNN with predictable resolution stages.
-
-    Input 16x16 → Stage 0 (16x16) → Stage 1 (8x8) → Stage 2 (4x4) → head.
-
-    Leaf module outputs at each resolution:
-        16x16: conv_a, conv_b
-         8x8 : pool_a, conv_c
-         4x4 : pool_b, conv_d  (also avgpool at 1x1 in final flush)
-         1x1 : avgpool
-    """
-
-    def __init__(self):
-        super().__init__()
-        self.conv_a = nn.Conv2d(3, 4, 3, padding=1)  # 16x16
-        self.conv_b = nn.Conv2d(4, 4, 3, padding=1)  # 16x16
-        self.pool_a = nn.MaxPool2d(2)  # 8x8
-        self.conv_c = nn.Conv2d(4, 8, 3, padding=1)  # 8x8
-        self.pool_b = nn.MaxPool2d(2)  # 4x4
-        self.conv_d = nn.Conv2d(8, 8, 1)  # 4x4
-        self.avgpool = nn.AdaptiveAvgPool2d(1)  # 1x1
-        self.fc = nn.Linear(8, 4)  # head (2D, not probed)
-
-    def forward(self, x):
-        x = self.conv_a(x)
-        x = self.conv_b(x)
-        x = self.pool_a(x)
-        x = self.conv_c(x)
-        x = self.pool_b(x)
-        x = self.conv_d(x)
-        x = self.avgpool(x)
-        x = x.flatten(1)
-        return self.fc(x)
-
-
 def _make_fake_units(n):
     """Return n synthetic UnfreezeUnit objects."""
     return [
@@ -84,100 +46,7 @@ def _make_fake_units(n):
 
 
 # ---------------------------------------------------------------------------
-# 1. Resolution Probe
-# ---------------------------------------------------------------------------
-
-
-class TestResolutionProbe(unittest.TestCase):
-
-    def setUp(self):
-        self.model = TinyCNN()
-        self.input_shape = (3, 16, 16)
-
-    def test_returns_list_of_dicts(self):
-        result = get_resolution_probe(self.model, self.input_shape)
-        self.assertIsInstance(result, list)
-        self.assertTrue(len(result) > 0)
-        for stage in result:
-            self.assertIn("stage_id", stage)
-            self.assertIn("resolution", stage)
-            self.assertIn("module_names", stage)
-            self.assertIn("parameter_count", stage)
-
-    def test_stage_ids_are_sequential(self):
-        result = get_resolution_probe(self.model, self.input_shape)
-        ids = [s["stage_id"] for s in result]
-        self.assertEqual(ids, list(range(len(ids))))
-
-    def test_resolutions_are_tuples(self):
-        result = get_resolution_probe(self.model, self.input_shape)
-        for stage in result:
-            res = stage["resolution"]
-            self.assertIsInstance(res, tuple)
-            self.assertEqual(len(res), 2)
-
-    def test_resolution_changes_between_stages(self):
-        result = get_resolution_probe(self.model, self.input_shape)
-        resolutions = [s["resolution"] for s in result]
-        # All resolutions should be distinct (each stage has a different H×W)
-        self.assertEqual(len(resolutions), len(set(resolutions)))
-
-    def test_detects_expected_stages_for_tiny_cnn(self):
-        """TinyCNN has resolution steps 16→8→4→1, so 4 stages."""
-        result = get_resolution_probe(self.model, self.input_shape)
-        resolutions = {s["resolution"] for s in result}
-        self.assertIn((16, 16), resolutions)
-        self.assertIn((8, 8), resolutions)
-        self.assertIn((4, 4), resolutions)
-        self.assertIn((1, 1), resolutions)
-
-    def test_module_names_are_non_empty_strings(self):
-        result = get_resolution_probe(self.model, self.input_shape)
-        for stage in result:
-            self.assertTrue(len(stage["module_names"]) > 0)
-            for name in stage["module_names"]:
-                self.assertIsInstance(name, str)
-                self.assertTrue(len(name) > 0)
-
-    def test_parameter_count_is_positive_or_zero(self):
-        result = get_resolution_probe(self.model, self.input_shape)
-        for stage in result:
-            self.assertGreaterEqual(stage["parameter_count"], 0)
-
-    def test_conv_a_and_conv_b_in_same_stage(self):
-        """conv_a and conv_b both output 16x16, so they share a stage."""
-        result = get_resolution_probe(self.model, self.input_shape)
-        stage_16 = next(s for s in result if s["resolution"] == (16, 16))
-        names = stage_16["module_names"]
-        self.assertIn("conv_a", names)
-        self.assertIn("conv_b", names)
-
-    def test_hooks_are_removed_after_probe(self):
-        """After the probe, no forward hooks should remain on the model."""
-        get_resolution_probe(self.model, self.input_shape)
-        hook_count = sum(len(m._forward_hooks) for m in self.model.modules())
-        self.assertEqual(hook_count, 0)
-
-    def test_model_remains_in_eval_mode(self):
-        self.model.train()
-        get_resolution_probe(self.model, self.input_shape)
-        self.assertFalse(self.model.training)
-
-    def test_resnet50_has_multiple_stages(self):
-        """ResNet50 (no weights) should probe to ≥4 resolution stages."""
-        resnet = models.resnet50(weights=None)
-        result = get_resolution_probe(resnet, (3, 224, 224))
-        self.assertGreaterEqual(len(result), 4)
-
-    def test_resnet50_stage_7x7_present(self):
-        resnet = models.resnet50(weights=None)
-        result = get_resolution_probe(resnet, (3, 224, 224))
-        resolutions = {s["resolution"] for s in result}
-        self.assertIn((7, 7), resolutions)
-
-
-# ---------------------------------------------------------------------------
-# 2. get_unfreeze_units
+# 1. get_unfreeze_units
 # ---------------------------------------------------------------------------
 
 
@@ -198,83 +67,89 @@ class TestGetUnfreezeUnits(unittest.TestCase):
 
     def test_returns_list_of_unfreeze_units(self):
         model = self._make_resnet50()
-        units = get_unfreeze_units(model, "resnet50", (3, 224, 224))
+        units = get_unfreeze_units(model, "resnet50")
         self.assertIsInstance(units, list)
         for u in units:
             self.assertIsInstance(u, UnfreezeUnit)
 
     def test_units_not_empty(self):
         model = self._make_resnet50()
-        units = get_unfreeze_units(model, "resnet50", (3, 224, 224))
+        units = get_unfreeze_units(model, "resnet50")
         self.assertGreater(len(units), 0)
+
+    def test_resnet50_has_expected_block_count(self):
+        """ResNet50 registry defines 5 blocks: stem + layer1-4."""
+        model = self._make_resnet50()
+        units = get_unfreeze_units(model, "resnet50")
+        self.assertEqual(len(units), 5)
 
     def test_classifier_excluded_from_units(self):
         """No unit should contain the 'fc' classifier module."""
         model = self._make_resnet50()
-        units = get_unfreeze_units(model, "resnet50", (3, 224, 224))
+        units = get_unfreeze_units(model, "resnet50")
         all_names = [name for u in units for name in u.module_names]
         self.assertFalse(any(name == "fc" for name in all_names))
 
     def test_ordered_output_to_input(self):
-        """For ResNet50, the first unit (output→input) should contain layer4
-        modules — layer4 is the last backbone stage before avgpool/fc."""
+        """For ResNet50, units[0] is layer4 and units[-1] is the stem."""
         model = self._make_resnet50()
-        units = get_unfreeze_units(model, "resnet50", (3, 224, 224))
+        units = get_unfreeze_units(model, "resnet50")
 
-        # All module names across all units
-        all_names = [name for u in units for name in u.module_names]
-
-        # layer4 modules should appear somewhere in the units list
-        self.assertTrue(
-            any("layer4" in name for name in all_names),
-            "Expected layer4 modules in unfreeze units",
+        # First unit (closest to head) should be layer4
+        self.assertEqual(
+            units[0].module_names,
+            ["layer4"],
+            f"Expected units[0] to be ['layer4'], got {units[0].module_names}",
         )
 
-        # The first unit (closest to head) should contain layer4 modules
-        # because layer4 is the last (output-most) backbone stage in ResNet
-        first_unit_names = units[0].module_names
-        self.assertTrue(
-            any("layer4" in name for name in first_unit_names),
-            f"Expected units[0] to contain layer4 modules, got: {first_unit_names[:3]}",
+        # Last unit (furthest from head) should be the stem [conv1, bn1]
+        self.assertEqual(
+            units[-1].module_names,
+            ["conv1", "bn1"],
+            f"Expected units[-1] to be ['conv1', 'bn1'], got {units[-1].module_names}",
         )
 
     def test_parameter_counts_positive(self):
         model = self._make_resnet50()
-        units = get_unfreeze_units(model, "resnet50", (3, 224, 224))
+        units = get_unfreeze_units(model, "resnet50")
         for u in units:
             self.assertGreater(u.parameter_count, 0)
 
-    def test_vit_isotropic_path(self):
-        """ViT-B/16 should use the isotropic registry and return 12 units."""
+    def test_unknown_backbone_raises(self):
+        model = self._make_resnet50()
+        with self.assertRaises(ValueError):
+            get_unfreeze_units(model, "nonexistent_backbone_xyz")
+
+    def test_vit_returns_12_units(self):
+        """ViT-B/16 registry has 12 transformer blocks."""
         vit = models.vit_b_16(weights=None)
-        # Attach a trivial head so _get_classifier_attr works
         vit.heads = nn.Linear(768, 4)
-        units = get_unfreeze_units(vit, "vit_b_16", (3, 224, 224))
+        units = get_unfreeze_units(vit, "vit_b_16")
         self.assertEqual(len(units), 12)
 
     def test_vit_units_are_transformer_blocks(self):
         vit = models.vit_b_16(weights=None)
         vit.heads = nn.Linear(768, 4)
-        units = get_unfreeze_units(vit, "vit_b_16", (3, 224, 224))
-        # All module_names should be of the form "encoder.layers.N"
+        units = get_unfreeze_units(vit, "vit_b_16")
+        # All module_names should be of the form "encoder.layers.encoder_layer_N"
         for u in units:
             for name in u.module_names:
                 self.assertTrue(
-                    name.startswith("encoder.layers."),
-                    f"Expected encoder.layers.N, got {name!r}",
+                    name.startswith("encoder.layers.encoder_layer_"),
+                    f"Expected encoder.layers.encoder_layer_N, got {name!r}",
                 )
 
     def test_vit_ordered_output_to_input(self):
-        """First unit should be block 11 (last block = closest to head)."""
+        """First unit should be block 11 (last = closest to head); last is block 0."""
         vit = models.vit_b_16(weights=None)
         vit.heads = nn.Linear(768, 4)
-        units = get_unfreeze_units(vit, "vit_b_16", (3, 224, 224))
-        self.assertIn("encoder.layers.11", units[0].module_names)
-        self.assertIn("encoder.layers.0", units[-1].module_names)
+        units = get_unfreeze_units(vit, "vit_b_16")
+        self.assertIn("encoder.layers.encoder_layer_11", units[0].module_names)
+        self.assertIn("encoder.layers.encoder_layer_0", units[-1].module_names)
 
 
 # ---------------------------------------------------------------------------
-# 3. thaw_units
+# 2. thaw_units
 # ---------------------------------------------------------------------------
 
 
@@ -294,7 +169,7 @@ class TestThawUnits(unittest.TestCase):
 
     def test_thaw_increases_trainable_params(self):
         model = self._frozen_resnet50()
-        units = get_unfreeze_units(model, "resnet50", (3, 224, 224))
+        units = get_unfreeze_units(model, "resnet50")
 
         before = sum(p.numel() for p in model.parameters() if p.requires_grad)
         thaw_units(model, [units[0]])
@@ -304,7 +179,7 @@ class TestThawUnits(unittest.TestCase):
 
     def test_thaw_returns_correct_count(self):
         model = self._frozen_resnet50()
-        units = get_unfreeze_units(model, "resnet50", (3, 224, 224))
+        units = get_unfreeze_units(model, "resnet50")
 
         n = thaw_units(model, [units[0]])
         self.assertGreater(n, 0)
@@ -318,7 +193,7 @@ class TestThawUnits(unittest.TestCase):
 
     def test_thaw_sets_requires_grad_true(self):
         model = self._frozen_resnet50()
-        units = get_unfreeze_units(model, "resnet50", (3, 224, 224))
+        units = get_unfreeze_units(model, "resnet50")
 
         unit = units[0]
         thaw_units(model, [unit])
@@ -332,7 +207,7 @@ class TestThawUnits(unittest.TestCase):
     def test_thaw_is_idempotent(self):
         """Calling thaw_units twice on the same unit should not double-count."""
         model = self._frozen_resnet50()
-        units = get_unfreeze_units(model, "resnet50", (3, 224, 224))
+        units = get_unfreeze_units(model, "resnet50")
 
         thaw_units(model, [units[0]])
         trainable_after_first = sum(
@@ -350,13 +225,10 @@ class TestThawUnits(unittest.TestCase):
 
     def test_other_units_remain_frozen(self):
         model = self._frozen_resnet50()
-        units = get_unfreeze_units(model, "resnet50", (3, 224, 224))
+        units = get_unfreeze_units(model, "resnet50")
 
         # Thaw only the first unit
         thaw_units(model, [units[0]])
-
-        # Collect all module names thawed
-        thawed_names = set(units[0].module_names)
 
         # Modules from other units should still be frozen
         for other_unit in units[1:]:
@@ -372,13 +244,10 @@ class TestThawUnits(unittest.TestCase):
         Simulates the entire training lifecycle:
         Starting from a frozen backbone and thawing every unit sequentially.
         """
-        # 1. Setup a fresh, frozen model
         print("=====================================================")
         model = self._frozen_resnet50()
 
-        # 2. Get the units (Stages) identified by the Resolution Probe
-        # For ResNet50, these are ordered from Output (Stage 4) to Input (Stage 1)
-        units = get_unfreeze_units(model, "resnet50", (3, 224, 224))
+        units = get_unfreeze_units(model, "resnet50")
 
         initial_trainable = sum(
             p.numel() for p in model.parameters() if p.requires_grad
@@ -387,16 +256,13 @@ class TestThawUnits(unittest.TestCase):
             f"\n[Simulation Start] Initial trainable (Head only): {initial_trainable:,}"
         )
 
-        # 3. Step through and thaw each unit
         for i, unit in enumerate(units):
             thaw_units(model, [unit])
             current_trainable = sum(
                 p.numel() for p in model.parameters() if p.requires_grad
             )
-
-            # We expect the number of trainable parameters to increase at every step
             print(
-                f"Step {i+1}: Unfroze Unit at {unit.resolution}. Trainable now: {current_trainable:,}"
+                f"Step {i+1}: Unfroze {unit.module_names}. Trainable now: {current_trainable:,}"
             )
 
         final_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -406,12 +272,12 @@ class TestThawUnits(unittest.TestCase):
             f"[Simulation End] Final trainable: {final_trainable:,} / Total: {total_params:,}"
         )
 
-        # Validation: At the end, everything should be trainable
+        # At the end, everything should be trainable
         self.assertEqual(final_trainable, total_params)
 
 
 # ---------------------------------------------------------------------------
-# 4. DynamicThawController
+# 3. DynamicThawController
 # ---------------------------------------------------------------------------
 
 
@@ -588,7 +454,7 @@ class TestDynamicThawController(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# 5. create_optimizer — dynamic_unfreeze_mode
+# 4. create_optimizer — dynamic_unfreeze_mode
 # ---------------------------------------------------------------------------
 
 
@@ -682,7 +548,7 @@ class TestCreateOptimizerDynamicMode(unittest.TestCase):
             model, options, "resnet50", dynamic_unfreeze_mode=True
         )
 
-        units = get_unfreeze_units(model, "resnet50", (3, 224, 224))
+        units = get_unfreeze_units(model, "resnet50")
         thaw_units(model, [units[0]])
         new_params = [
             p

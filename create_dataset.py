@@ -41,23 +41,55 @@ def merge_and_split_dataset(
             path = os.path.join(dest_dir, split, category)
             os.makedirs(path, exist_ok=True)
 
+    # --- 2b. Pre-scan: Build {source_dir -> {category -> set_of_basenames}} ---
+    print("\nPre-scanning source directories for cross-category deduplication...")
+    source_basenames = {}
+    for source_main_dir in [source_dir1, source_dir2]:
+        cat_to_names = {}
+        for cat in categories:
+            cat_path = os.path.join(source_main_dir, cat)
+            if os.path.isdir(cat_path):
+                cat_to_names[cat] = {f for f in os.listdir(cat_path) if f.lower().endswith('.png')}
+            else:
+                cat_to_names[cat] = set()
+        source_basenames[source_main_dir] = cat_to_names
+
     # --- 3. Process Each Category ---
     for category in categories:
         print(f"\nProcessing category: {category}")
 
         # --- 4. Gather and Combine All Image Paths ---
         all_image_paths = []
+        seen_cross_source = set()  # basenames already collected from a prior source dir
         for source_main_dir in [source_dir1, source_dir2]:
             category_path = os.path.join(source_main_dir, category)
             if not os.path.isdir(category_path):
                 print(f"Warning: Directory not found, skipping: {category_path}")
                 continue
 
-            # Get full paths to each image
-            images = [os.path.join(category_path, f) for f in os.listdir(category_path)]
+            # Build exclusion set: basenames present in any OTHER category within
+            # this source directory, plus basenames already collected from the other
+            # source directory for this same category.
+            exclusion_set = set()
+            for other_cat, other_names in source_basenames[source_main_dir].items():
+                if other_cat != category:
+                    exclusion_set |= other_names
+            exclusion_set |= seen_cross_source
+
+            # Only consider .png files; filter out duplicates, then sample
+            all_files = [f for f in os.listdir(category_path) if f.lower().endswith('.png')]
+            excluded = [f for f in all_files if f in exclusion_set]
+            kept = [f for f in all_files if f not in exclusion_set]
+            if excluded:
+                print(
+                    f"  [{source_main_dir}] Excluded {len(excluded)} file(s) from"
+                    f" '{category}' (duplicate across category or source directory)."
+                )
+            images = [os.path.join(category_path, f) for f in kept]
             random.shuffle(images)
             images = images[: n // 2]
             all_image_paths.extend(images)
+            seen_cross_source.update(os.path.basename(p) for p in images)
 
         # --- 5. Shuffle and Split the Combined List ---
         random.shuffle(all_image_paths)
@@ -101,7 +133,7 @@ colonized_folder = "./Colonized"
 noncolonized_folder = "./Noncolonized"
 
 # 3. Define where you want the final, split dataset to be created.
-final_dataset_folder = "./final_split_dataset"
+final_dataset_folder = "./data/single_label_category_balanced/"
 
 # 4. Run the function with your defined paths.
 merge_and_split_dataset(

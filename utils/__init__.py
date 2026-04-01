@@ -8,12 +8,18 @@ from .model_utils import (
     load_model,
     count_parameters,
     BACKBONE_REGISTRY,
-    get_resolution_probe,
+    BACKBONE_UNFREEZE_BLOCKS,
     get_unfreeze_units,
     thaw_units,
     UnfreezeUnit,
 )
-from .trainer import train_model, DynamicThawController
+from .trainer import (
+    train_model,
+    DynamicThawController,
+    build_criterion,
+    prepare_targets_for_loss,
+    logits_to_probs,
+)
 from .visualization import (
     load_metrics,
     load_results,

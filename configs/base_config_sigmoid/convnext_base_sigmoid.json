@@ -1,14 +1,15 @@
 {
-    "experiment_name": "densenet201_frozen",
+    "experiment_name": "convnext_base_sigmoid_frozen",
     "model": {
-        "backbone": "densenet201",
+        "backbone": "convnext_base",
         "pretrained": true,
         "freeze_backbone": true,
         "classifier_hidden": [1024],
-        "dropout": 0.2
+        "dropout": 0.2,
+        "loss_fn": "bce_sigmoid"
     },
     "data": {
-        "path": "/scratch/hl98745/category_balanced_dataset",
+        "path": "/work/omlpa/HL98745/data/single_label_category_balanced_filtered",
         "input_size": 224,
         "batch_size": 32,
         "num_workers": 8

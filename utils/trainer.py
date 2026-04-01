@@ -5,6 +5,7 @@ Stateless training function that takes a config, runs an experiment,
 and saves results. Supports mixed precision and early stopping.
 """
 
+import gc
 import os
 import json
 import time
@@ -43,6 +44,67 @@ from .visualization import (
 
 
 # ---------------------------------------------------------------------------
+# Loss Function Helpers
+# ---------------------------------------------------------------------------
+
+
+def build_criterion(loss_fn):
+    """
+    Construct a loss criterion from a string identifier.
+
+    Args:
+        loss_fn: One of 'cross_entropy', 'bce_sigmoid'
+
+    Returns:
+        nn.Module: The loss criterion
+    """
+    if loss_fn == "cross_entropy":
+        return nn.CrossEntropyLoss()
+    elif loss_fn == "bce_sigmoid":
+        return nn.BCEWithLogitsLoss()
+    else:
+        raise ValueError(
+            f"Unknown loss_fn: {loss_fn!r}. Supported values: 'cross_entropy', 'bce_sigmoid'."
+        )
+
+
+def prepare_targets_for_loss(targets, num_classes, loss_fn):
+    """
+    Convert integer class indices to the format required by the criterion.
+
+    CrossEntropyLoss expects a LongTensor of class indices [B].
+    BCEWithLogitsLoss expects a float one-hot tensor [B, num_classes].
+
+    Args:
+        targets: LongTensor of class indices [B]
+        num_classes: Total number of classes
+        loss_fn: Loss function identifier string
+
+    Returns:
+        Tensor in the correct dtype/shape for the criterion
+    """
+    if loss_fn == "bce_sigmoid":
+        return nn.functional.one_hot(targets, num_classes).float()
+    return targets
+
+
+def logits_to_probs(outputs, loss_fn):
+    """
+    Convert raw model logits to class probabilities.
+
+    Args:
+        outputs: Raw logits [B, num_classes]
+        loss_fn: Loss function identifier string
+
+    Returns:
+        Tensor of probabilities [B, num_classes]
+    """
+    if loss_fn == "bce_sigmoid":
+        return torch.sigmoid(outputs)
+    return torch.softmax(outputs, dim=1)
+
+
+# ---------------------------------------------------------------------------
 # Reproducibility
 # ---------------------------------------------------------------------------
 
@@ -53,7 +115,7 @@ def set_seed(seed):
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
-        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.deterministic = False
         torch.backends.cudnn.benchmark = False
 
 
@@ -159,6 +221,8 @@ def create_dataloaders(options):
         shuffle=True,
         num_workers=num_workers,
         pin_memory=True,
+        persistent_workers=False,
+        prefetch_factor=2,
     )
     val_loader = DataLoader(
         val_dataset,
@@ -166,6 +230,8 @@ def create_dataloaders(options):
         shuffle=False,
         num_workers=num_workers,
         pin_memory=True,
+        persistent_workers=False,
+        prefetch_factor=2,
     )
     test_loader = DataLoader(
         test_dataset,
@@ -173,6 +239,8 @@ def create_dataloaders(options):
         shuffle=False,
         num_workers=num_workers,
         pin_memory=True,
+        persistent_workers=False,
+        prefetch_factor=2,
     )
 
     print(
@@ -370,7 +438,8 @@ def compute_per_class_metrics(targets, predictions, num_classes):
 # ---------------------------------------------------------------------------
 
 
-def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, device):
+def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, device,
+                    loss_fn="cross_entropy"):
     """
     Train for one epoch with mixed precision.
 
@@ -387,7 +456,8 @@ def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, devi
 
         with autocast("cuda"):
             outputs = model(inputs)
-            loss = criterion(outputs, targets)
+            targets_for_loss = prepare_targets_for_loss(targets, outputs.size(1), loss_fn)
+            loss = criterion(outputs, targets_for_loss)
 
         scaler.scale(loss).backward()
         scaler.step(optimizer)
@@ -401,7 +471,7 @@ def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, devi
     return total_loss / len(loader)
 
 
-def evaluate(model, loader, criterion, device):
+def evaluate(model, loader, criterion, device, loss_fn="cross_entropy"):
     """
     Evaluate model on a dataloader.
 
@@ -419,7 +489,8 @@ def evaluate(model, loader, criterion, device):
 
             with autocast("cuda"):
                 outputs = model(inputs)
-                loss = criterion(outputs, targets)
+                targets_for_loss = prepare_targets_for_loss(targets, outputs.size(1), loss_fn)
+                loss = criterion(outputs, targets_for_loss)
 
             top1 = compute_accuracy(outputs, targets)
 
@@ -433,7 +504,7 @@ def evaluate(model, loader, criterion, device):
     }
 
 
-def evaluate_with_predictions(model, loader, device):
+def evaluate_with_predictions(model, loader, device, loss_fn="cross_entropy"):
     """
     Evaluate model and collect all predictions for confusion matrix.
 
@@ -441,6 +512,7 @@ def evaluate_with_predictions(model, loader, device):
         model: The model to evaluate
         loader: DataLoader for evaluation
         device: Device to run on
+        loss_fn: Loss function identifier (unused here, kept for signature consistency)
 
     Returns:
         tuple: (all_targets, all_predictions) as lists
@@ -463,7 +535,7 @@ def evaluate_with_predictions(model, loader, device):
     return all_targets, all_predictions
 
 
-def evaluate_full(model, loader, criterion, device, class_names):
+def evaluate_full(model, loader, criterion, device, class_names, loss_fn="cross_entropy"):
     """
     Evaluate model with full per-class and macro metrics in a single pass.
 
@@ -477,6 +549,7 @@ def evaluate_full(model, loader, criterion, device, class_names):
         criterion: Loss function
         device: Device to run on
         class_names: List of class name strings (from dataset.classes)
+        loss_fn: Loss function identifier string
 
     Returns:
         dict with keys:
@@ -500,7 +573,8 @@ def evaluate_full(model, loader, criterion, device, class_names):
 
             with autocast("cuda"):
                 outputs = model(inputs)
-                loss = criterion(outputs, targets)
+                targets_for_loss = prepare_targets_for_loss(targets, outputs.size(1), loss_fn)
+                loss = criterion(outputs, targets_for_loss)
 
             _, predicted = outputs.max(1)
             total_loss += loss.item()
@@ -865,7 +939,8 @@ def train_model(options, trial=None, results_dir_override=None):
 
     # Training components
     dynamic_unfreeze_opts = options["training"].get("dynamic_unfreeze")
-    criterion = nn.CrossEntropyLoss()
+    loss_fn = options["model"].get("loss_fn", "cross_entropy")
+    criterion = build_criterion(loss_fn)
     optimizer = create_optimizer(
         model, options, backbone_name,
         dynamic_unfreeze_mode=bool(dynamic_unfreeze_opts)
@@ -879,9 +954,8 @@ def train_model(options, trial=None, results_dir_override=None):
     # Dynamic unfreezing controller (plateau-triggered)
     thaw_controller = None
     if dynamic_unfreeze_opts:
-        input_shape = (3, options["data"]["input_size"], options["data"]["input_size"])
-        unfreeze_units = get_unfreeze_units(model, backbone_name, input_shape)
-        print(f"[Dynamic Unfreeze] Detected {len(unfreeze_units)} backbone unit(s).")
+        unfreeze_units = get_unfreeze_units(model, backbone_name)
+        print(f"[Dynamic Unfreeze] {len(unfreeze_units)} backbone block(s) available.")
         thaw_controller = DynamicThawController(
             units=unfreeze_units,
             unfreeze_patience=dynamic_unfreeze_opts["unfreeze_patience"],
@@ -897,6 +971,7 @@ def train_model(options, trial=None, results_dir_override=None):
     # Training state
     best_val_acc_top1 = 0.0
     best_epoch = 0
+    unfreeze_event_count = 0  # Tracks dynamic unfreeze events; used as Optuna pruning step
 
     # Training loop
     for epoch in range(1, epochs + 1):
@@ -920,15 +995,26 @@ def train_model(options, trial=None, results_dir_override=None):
             print(f"  Trainable: {trainable:,} / {total:,}\n")
 
         train_loss = train_one_epoch(
-            model, train_loader, criterion, optimizer, scheduler, scaler, device
+            model, train_loader, criterion, optimizer, scheduler, scaler, device,
+            loss_fn=loss_fn
         )
 
-        val_metrics = evaluate_full(model, val_loader, criterion, device, class_names)
+        val_metrics = evaluate_full(model, val_loader, criterion, device, class_names,
+                                    loss_fn=loss_fn)
 
         # Dynamic plateau-triggered unfreezing
         if thaw_controller is not None:
             result = thaw_controller.step(val_metrics["loss"])
             if result is not None:
+                # Optuna pruning checkpoint: evaluate right before unfreezing.
+                # Step = unfreeze event index so comparisons across trials are apples-to-apples.
+                # Negate val_loss because the study direction is "maximize".
+                if trial is not None:
+                    import optuna
+                    trial.report(-val_metrics["loss"], unfreeze_event_count)
+                    if trial.should_prune():
+                        raise optuna.TrialPruned()
+
                 units_batch, unit_lr = result
                 thaw_units(model, units_batch)
                 new_params = [
@@ -948,9 +1034,11 @@ def train_model(options, trial=None, results_dir_override=None):
                     f"\n[Epoch {epoch}] Dynamic unfreeze: {len(units_batch)} unit(s) "
                     f"@ lr={unit_lr:.2e} | Trainable: {trainable:,}/{total:,}\n"
                 )
+                unfreeze_event_count += 1
 
-        # Optuna pruning check
-        if trial is not None:
+        # Epoch-based Optuna pruning (non-dynamic mode only).
+        # Dynamic mode uses unfreeze-event pruning above.
+        if trial is not None and thaw_controller is None:
             trial.report(val_metrics["acc_top1"], epoch)
             if trial.should_prune():
                 import optuna
@@ -973,7 +1061,8 @@ def train_model(options, trial=None, results_dir_override=None):
 
     # Load best model and evaluate on test set
     load_checkpoint(model, results_dir)
-    test_metrics = evaluate_full(model, test_loader, criterion, device, class_names)
+    test_metrics = evaluate_full(model, test_loader, criterion, device, class_names,
+                                 loss_fn=loss_fn)
 
     # Measure inference time
     input_size = options["data"]["input_size"]
@@ -1004,7 +1093,7 @@ def train_model(options, trial=None, results_dir_override=None):
     with open(results_path, "w") as f:
         json.dump(results, f, indent=2)
 
-    # Generate visualizations
+    # Generate visualizations (must happen before deleting DataLoaders)
     print("\n[Visualization] Generating training plots...")
     try:
         plot_loss_curves(experiment_name, save=True, show=False, results_dir=results_dir)
@@ -1014,7 +1103,7 @@ def train_model(options, trial=None, results_dir_override=None):
 
         # Confusion matrix on test set
         all_targets, all_predictions = evaluate_with_predictions(
-            model, test_loader, device
+            model, test_loader, device, loss_fn=loss_fn
         )
         # Get class names from ImageFolder dataset
         class_names = getattr(test_loader.dataset, 'classes', None)
@@ -1029,5 +1118,13 @@ def train_model(options, trial=None, results_dir_override=None):
         print(f"[Visualization] All plots saved to {results_dir}")
     except Exception as e:
         print(f"[Warning] Visualization failed: {e}")
+
+    # Explicitly shut down DataLoader workers before returning.
+    # With persistent_workers=True and pin_memory=True, workers and the
+    # pin_memory_thread can deadlock during GC at trial boundaries unless
+    # the loaders are deleted here while the CUDA context is still alive.
+    del train_loader, val_loader, test_loader
+    gc.collect()
+    torch.cuda.empty_cache()
 
     return results

@@ -55,6 +55,111 @@ BACKBONE_REGISTRY = {
 
 
 # ---------------------------------------------------------------------------
+# Backbone Unfreeze Block Registry
+# ---------------------------------------------------------------------------
+# Maps backbone name → list of block specs ordered **input→output**.
+# Each spec is either a str (single module path) or list[str] (multiple paths
+# that form one indivisible unit, e.g. a stem with conv + bn).
+# get_unfreeze_units() and get_backbone_blocks() reverse this to output→input.
+
+BACKBONE_UNFREEZE_BLOCKS = {
+    # ResNet family — initial stem + 4 residual stages
+    "resnet50":  [["conv1", "bn1"], "layer1", "layer2", "layer3", "layer4"],
+    "resnet101": [["conv1", "bn1"], "layer1", "layer2", "layer3", "layer4"],
+    "resnet152": [["conv1", "bn1"], "layer1", "layer2", "layer3", "layer4"],
+
+    # DenseNet family — stem + 4 (denseblock, transition) pairs + final norm
+    "densenet121": [
+        ["features.conv0", "features.norm0", "features.relu0", "features.pool0"],
+        ["features.denseblock1", "features.transition1"],
+        ["features.denseblock2", "features.transition2"],
+        ["features.denseblock3", "features.transition3"],
+        ["features.denseblock4", "features.norm5"],
+    ],
+    "densenet169": [
+        ["features.conv0", "features.norm0", "features.relu0", "features.pool0"],
+        ["features.denseblock1", "features.transition1"],
+        ["features.denseblock2", "features.transition2"],
+        ["features.denseblock3", "features.transition3"],
+        ["features.denseblock4", "features.norm5"],
+    ],
+    "densenet201": [
+        ["features.conv0", "features.norm0", "features.relu0", "features.pool0"],
+        ["features.denseblock1", "features.transition1"],
+        ["features.denseblock2", "features.transition2"],
+        ["features.denseblock3", "features.transition3"],
+        ["features.denseblock4", "features.norm5"],
+    ],
+
+    # VGG16 — 5 pooling stages; indices derived from features Sequential (no BN)
+    # Stage boundaries (MaxPool2d at indices 4, 9, 16, 23, 30):
+    "vgg16": [
+        [f"features.{i}" for i in range(0, 5)],   # 2 conv + pool
+        [f"features.{i}" for i in range(5, 10)],  # 2 conv + pool
+        [f"features.{i}" for i in range(10, 17)], # 3 conv + pool
+        [f"features.{i}" for i in range(17, 24)], # 3 conv + pool
+        [f"features.{i}" for i in range(24, 31)], # 3 conv + pool
+    ],
+    # VGG19 — 5 pooling stages (MaxPool2d at indices 4, 9, 18, 27, 36)
+    "vgg19": [
+        [f"features.{i}" for i in range(0, 5)],
+        [f"features.{i}" for i in range(5, 10)],
+        [f"features.{i}" for i in range(10, 19)], # 4 conv + pool
+        [f"features.{i}" for i in range(19, 28)], # 4 conv + pool
+        [f"features.{i}" for i in range(28, 37)], # 4 conv + pool
+    ],
+
+    # AlexNet — 3 groups separated by MaxPool2d
+    "alexnet": [
+        [f"features.{i}" for i in range(0, 3)],  # conv1 + relu + pool
+        [f"features.{i}" for i in range(3, 6)],  # conv2 + relu + pool
+        [f"features.{i}" for i in range(6, 13)], # conv3-5 + relu + pool
+    ],
+
+    # Inception v3 — stem convs + inception modules
+    "inception_v3": [
+        "Conv2d_1a_3x3", "Conv2d_2a_3x3", "Conv2d_2b_3x3",
+        "Conv2d_3b_1x1", "Conv2d_4a_3x3",
+        "Mixed_5b", "Mixed_5c", "Mixed_5d",
+        "Mixed_6a", "Mixed_6b", "Mixed_6c", "Mixed_6d", "Mixed_6e",
+        "Mixed_7a", "Mixed_7b", "Mixed_7c",
+    ],
+
+    # GoogLeNet — stem convs + inception modules
+    "googlenet": [
+        "conv1", "conv2", "conv3",
+        "inception3a", "inception3b",
+        "inception4a", "inception4b", "inception4c", "inception4d", "inception4e",
+        "inception5a", "inception5b",
+    ],
+
+    # EfficientNet — stem (features.0) + 7 MBConv stages + head conv (features.8)
+    "efficientnet_b0": [f"features.{i}" for i in range(9)],
+    "efficientnet_b1": [f"features.{i}" for i in range(9)],
+    "efficientnet_b2": [f"features.{i}" for i in range(9)],
+    "efficientnet_b3": [f"features.{i}" for i in range(9)],
+    "efficientnet_b4": [f"features.{i}" for i in range(9)],
+
+    # Vision Transformer — each transformer encoder block is its own unit
+    # torchvision names them encoder_layer_0 … encoder_layer_N inside encoder.layers
+    "vit_b_16": [f"encoder.layers.encoder_layer_{i}" for i in range(12)],
+    "vit_b_32": [f"encoder.layers.encoder_layer_{i}" for i in range(12)],
+    "vit_l_16": [f"encoder.layers.encoder_layer_{i}" for i in range(24)],
+
+    # Swin Transformer — patch embed + 4 transformer stages + 3 patch merges + norm
+    # features.0=PatchEmbed, features.1/3/5/7=SwinStage, features.2/4/6=PatchMerging
+    "swin_t": [f"features.{i}" for i in range(8)] + ["norm"],
+    "swin_s": [f"features.{i}" for i in range(8)] + ["norm"],
+    "swin_b": [f"features.{i}" for i in range(8)] + ["norm"],
+
+    # ConvNeXt — patchify stem + 4 ConvNeXt stages + 3 downsampling layers
+    "convnext_tiny":  [f"features.{i}" for i in range(8)],
+    "convnext_small": [f"features.{i}" for i in range(8)],
+    "convnext_base":  [f"features.{i}" for i in range(8)],
+}
+
+
+# ---------------------------------------------------------------------------
 # Feature Dimension Detection
 # ---------------------------------------------------------------------------
 
@@ -257,205 +362,70 @@ def count_parameters(model):
 
 
 # ---------------------------------------------------------------------------
-# Resolution Probe
+# Unfreeze Units
 # ---------------------------------------------------------------------------
 
 
 @dataclass
 class UnfreezeUnit:
     """
-    An atomic group of backbone layers that share a resolution stage.
+    An atomic group of backbone modules that are thawed together.
 
     Ordered output→input when returned by get_unfreeze_units(), so index 0
-    is the stage closest to the classifier head (safest to unfreeze first).
+    is the block closest to the classifier head (safest to unfreeze first).
     """
 
     stage_id: int
-    module_names: List[str]
+    module_names: List[str]  # dotted paths resolvable via model.get_submodule()
     parameter_count: int
-    resolution: Optional[tuple] = None  # (H, W) for CNN stages; None for isotropic
 
 
-def get_resolution_probe(model, input_shape=(3, 224, 224)):
-    """
-    Probe a model's spatial resolution stages using forward hooks.
-
-    Attaches temporary hooks to every leaf module (no children), records
-    4-D tensor outputs (B, C, H, W), and groups modules into stages
-    whenever the spatial resolution (H, W) changes.
-
-    Args:
-        model: Any nn.Module backbone (with classifier still attached).
-        input_shape: Tuple (C, H, W) for the dummy forward pass.
-
-    Returns:
-        List[dict]: Ordered input→output, each entry:
-            {
-                "stage_id": int,
-                "resolution": (H, W),
-                "module_names": List[str],  # dotted paths, e.g. "layer1.0.conv1"
-                "parameter_count": int,
-            }
-    """
-    model.eval()
-
-    # Build id(module) → dotted name map for all named modules
-    module_to_name = {id(m): name for name, m in model.named_modules()}
-
-    resolution_map = []
-    current_stage_names = []
-    last_resolution = None
-    stage_counter = [0]  # list so the closure can mutate it
-
-    def hook_fn(module, _input, output):
-        if not (isinstance(output, torch.Tensor) and output.dim() == 4):
-            return
-
-        res = (output.shape[2], output.shape[3])
-        nonlocal last_resolution
-
-        if last_resolution is not None and res != last_resolution:
-            # Flush completed stage
-            stage_params = sum(
-                p.numel()
-                for name in current_stage_names
-                for p in model.get_submodule(name).parameters()
-            )
-            resolution_map.append(
-                {
-                    "stage_id": stage_counter[0],
-                    "resolution": last_resolution,
-                    "module_names": current_stage_names.copy(),
-                    "parameter_count": stage_params,
-                }
-            )
-            current_stage_names.clear()
-            stage_counter[0] += 1
-
-        last_resolution = res
-        name = module_to_name.get(id(module), "")
-        if name:
-            current_stage_names.append(name)
-
-    # Attach hooks only to leaf modules (avoids double-counting containers)
-    hooks = []
-    for module in model.modules():
-        if len(list(module.children())) == 0:
-            hooks.append(module.register_forward_hook(hook_fn))
-
-    device = next(model.parameters()).device
-    dummy = torch.zeros(1, *input_shape).to(device)
-    with torch.no_grad():
-        try:
-            model(dummy)
-        except Exception:
-            pass  # Some models (e.g. Inception) may error on dummy; hooks still fired
-
-    for h in hooks:
-        h.remove()
-
-    # Flush the final stage
-    if current_stage_names and last_resolution is not None:
-        stage_params = sum(
-            p.numel()
-            for name in current_stage_names
-            for p in model.get_submodule(name).parameters()
-        )
-        resolution_map.append(
-            {
-                "stage_id": stage_counter[0],
-                "resolution": last_resolution,
-                "module_names": current_stage_names.copy(),
-                "parameter_count": stage_params,
-            }
-        )
-
-    return resolution_map
-
-
-# Architectures whose intermediate activations are not 4-D spatial tensors.
-# Values are dotted paths to their sequential block container.
-_ISOTROPIC_REGISTRY = {
-    "vit_b_16": "encoder.layers",
-    "vit_b_32": "encoder.layers",
-    "vit_l_16": "encoder.layers",
-}
-
-
-def get_unfreeze_units(model, backbone_name, input_shape=(3, 224, 224)):
+def get_unfreeze_units(model, backbone_name):
     """
     Partition the backbone into UnfreezeUnit objects for dynamic unfreezing.
 
-    For CNN/Swin backbones: uses the resolution probe to group layers by stage.
-    For isotropic architectures (ViT): falls back to the isotropic registry,
-    treating each transformer block as its own unit.
+    Looks up the hardcoded BACKBONE_UNFREEZE_BLOCKS registry for the given
+    architecture. Units are ordered **output→input** (index 0 = closest to
+    the classifier head, safest to unfreeze first).
 
-    The returned list is ordered **output → input** (index 0 = closest to head),
-    mirroring the convention of get_backbone_blocks().
+    Parameter-free entries (e.g. pure pooling blocks) are silently skipped.
 
     Args:
         model: The full model (backbone + classifier attached).
-        backbone_name: Registry key, e.g. "resnet50".
-        input_shape: (C, H, W) tuple for the resolution probe.
+        backbone_name: Registry key, e.g. "resnet152".
 
     Returns:
         List[UnfreezeUnit]: Units ordered output→input.
+
+    Raises:
+        ValueError: If backbone_name is not in BACKBONE_UNFREEZE_BLOCKS.
     """
-    classifier_attr = _get_classifier_attr(backbone_name)
+    if backbone_name not in BACKBONE_UNFREEZE_BLOCKS:
+        raise ValueError(
+            f"No unfreeze block definition for '{backbone_name}'. "
+            f"Add it to BACKBONE_UNFREEZE_BLOCKS."
+        )
 
-    if backbone_name in _ISOTROPIC_REGISTRY:
-        # Enumerate transformer blocks by index
-        container_path = _ISOTROPIC_REGISTRY[backbone_name]
-        container = model.get_submodule(container_path)
-        units = []
-        for i, block in enumerate(container):
-            block_path = f"{container_path}.{i}"
-            param_count = sum(p.numel() for p in block.parameters())
-            units.append(
-                UnfreezeUnit(
-                    stage_id=i,
-                    module_names=[block_path],
-                    parameter_count=param_count,
-                )
-            )
-        # Reverse so output-most block (last index) is first
-        return list(reversed(units))
-
-    # CNN / Swin path: use the resolution probe
-    resolution_map = get_resolution_probe(model, input_shape)
-
-    # Identify which module names belong to the classifier to skip them
-    classifier_module = getattr(model, classifier_attr)
-    classifier_ids = {id(m) for m in classifier_module.modules()}
-
+    block_specs = BACKBONE_UNFREEZE_BLOCKS[backbone_name]  # input→output order
     units = []
-    for stage in resolution_map:
-        # Filter out any classifier modules that appeared in this stage
-        backbone_names = [
-            name
-            for name in stage["module_names"]
-            if id(model.get_submodule(name)) not in classifier_ids
-        ]
-        if not backbone_names:
-            continue
+    for i, spec in enumerate(block_specs):
+        module_names = [spec] if isinstance(spec, str) else list(spec)
         param_count = sum(
             p.numel()
-            for name in backbone_names
+            for name in module_names
             for p in model.get_submodule(name).parameters()
         )
-        # Skip parameter-free stages (e.g. pure pooling layers like avgpool)
         if param_count == 0:
-            continue
+            continue  # skip parameter-free entries (e.g. pooling layers)
         units.append(
             UnfreezeUnit(
-                stage_id=stage["stage_id"],
-                module_names=backbone_names,
+                stage_id=i,
+                module_names=module_names,
                 parameter_count=param_count,
-                resolution=stage["resolution"],
             )
         )
 
-    # Reverse to output→input order
+    # Reverse to output→input order (closest to head first)
     return list(reversed(units))
 
 
@@ -490,31 +460,36 @@ def thaw_units(model, units):
 
 def get_backbone_blocks(model, backbone_name):
     """
-    Dynamically identify atomic blocks via named_children().
+    Return the backbone's unfreezeble blocks ordered output→input.
 
-    Returns list ordered from output→input (for thawing order).
-    Blocks closest to the classifier head are first (safest to unfreeze).
+    Uses the BACKBONE_UNFREEZE_BLOCKS registry. Each element of the returned
+    list is itself a list of module path strings belonging to that block
+    (most blocks have a single path; grouped stems have multiple).
+    Parameter-free entries are silently skipped.
 
     Args:
         model: The loaded model with classifier attached
         backbone_name: String identifier for the architecture
 
     Returns:
-        list[str]: Block names ordered from output to input
+        list[list[str]]: Block path groups ordered from output to input
     """
-    classifier_attr = _get_classifier_attr(backbone_name)
+    if backbone_name not in BACKBONE_UNFREEZE_BLOCKS:
+        raise ValueError(f"No block definition for '{backbone_name}'.")
 
+    specs = BACKBONE_UNFREEZE_BLOCKS[backbone_name]  # input→output
     blocks = []
-    for name, module in model.named_children():
-        # Skip classifier head
-        if name == classifier_attr:
-            continue
-        # Keep modules that have parameters
-        if any(p.numel() > 0 for p in module.parameters()):
-            blocks.append(name)
+    for spec in specs:
+        module_names = [spec] if isinstance(spec, str) else list(spec)
+        param_count = sum(
+            p.numel()
+            for name in module_names
+            for p in model.get_submodule(name).parameters()
+        )
+        if param_count > 0:
+            blocks.append(module_names)
 
-    # Reverse so output layers come first (thaw from output toward input)
-    return list(reversed(blocks))
+    return list(reversed(blocks))  # output→input
 
 
 def thaw_backbone_percentage(model, backbone_name, percentage):
@@ -530,24 +505,24 @@ def thaw_backbone_percentage(model, backbone_name, percentage):
         percentage: Float 0.0-1.0 indicating fraction to unfreeze
 
     Returns:
-        list[str]: Names of blocks that were unfrozen
+        list[str]: Flat list of all module paths that were unfrozen
     """
     if not 0.0 <= percentage <= 1.0:
         raise ValueError(f"Thaw percentage must be 0.0-1.0, got {percentage}")
 
-    blocks = get_backbone_blocks(model, backbone_name)
+    blocks = get_backbone_blocks(model, backbone_name)  # list[list[str]], output→input
     if not blocks:
         return []
 
     n_to_unfreeze = max(1, int(len(blocks) * percentage))
     blocks_to_thaw = blocks[:n_to_unfreeze]
 
-    for block_name in blocks_to_thaw:
-        block = getattr(model, block_name)
-        for param in block.parameters():
-            param.requires_grad = True
+    for module_names in blocks_to_thaw:
+        for name in module_names:
+            for param in model.get_submodule(name).parameters():
+                param.requires_grad = True
 
-    return blocks_to_thaw
+    return [name for module_names in blocks_to_thaw for name in module_names]
 
 
 # ---------------------------------------------------------------------------

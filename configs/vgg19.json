@@ -8,7 +8,7 @@
         "dropout": 0.2
     },
     "data": {
-        "path": "/scratch/hl98745/data/final_split_dataset",
+        "path": "/scratch/hl98745/category_balanced_dataset",
         "input_size": 224,
         "batch_size": 32,
         "num_workers": 8
