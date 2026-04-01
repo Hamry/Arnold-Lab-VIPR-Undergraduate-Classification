@@ -1093,15 +1093,7 @@ def train_model(options, trial=None, results_dir_override=None):
     with open(results_path, "w") as f:
         json.dump(results, f, indent=2)
 
-    # Explicitly shut down DataLoader workers before returning.
-    # With persistent_workers=True and pin_memory=True, workers and the
-    # pin_memory_thread can deadlock during GC at trial boundaries unless
-    # the loaders are deleted here while the CUDA context is still alive.
-    del train_loader, val_loader, test_loader
-    gc.collect()
-    torch.cuda.empty_cache()
-
-    # Generate visualizations
+    # Generate visualizations (must happen before deleting DataLoaders)
     print("\n[Visualization] Generating training plots...")
     try:
         plot_loss_curves(experiment_name, save=True, show=False, results_dir=results_dir)
@@ -1126,5 +1118,13 @@ def train_model(options, trial=None, results_dir_override=None):
         print(f"[Visualization] All plots saved to {results_dir}")
     except Exception as e:
         print(f"[Warning] Visualization failed: {e}")
+
+    # Explicitly shut down DataLoader workers before returning.
+    # With persistent_workers=True and pin_memory=True, workers and the
+    # pin_memory_thread can deadlock during GC at trial boundaries unless
+    # the loaders are deleted here while the CUDA context is still alive.
+    del train_loader, val_loader, test_loader
+    gc.collect()
+    torch.cuda.empty_cache()
 
     return results
