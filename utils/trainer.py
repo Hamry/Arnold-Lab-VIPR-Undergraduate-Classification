@@ -19,6 +19,7 @@ matplotlib.use('Agg')  # Non-interactive backend for SLURM/headless
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.amp.grad_scaler import GradScaler
 from torch.amp.autocast_mode import autocast
 from torch.utils.data import DataLoader
@@ -48,12 +49,75 @@ from .visualization import (
 # ---------------------------------------------------------------------------
 
 
-def build_criterion(loss_fn):
+class FocalLoss(nn.Module):
+    """Multi-class focal loss (softmax/cross-entropy variant).
+
+    FL(p_t) = -alpha_t * (1 - p_t)^gamma * log(p_t)
+
+    Args:
+        gamma: Focusing parameter. Higher values down-weight easy examples more.
+        alpha: Optional class weights. None, a scalar, or a list/tensor of
+               length num_classes.
+        reduction: 'mean' or 'sum'.
+    """
+
+    def __init__(self, gamma=2.0, alpha=None, reduction="mean"):
+        super().__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+        self.reduction = reduction
+
+    def forward(self, inputs, targets):
+        # inputs: [B, C] logits, targets: [B] long
+        log_p = F.log_softmax(inputs, dim=1)
+        p = torch.exp(log_p)
+        log_pt = log_p.gather(1, targets.unsqueeze(1)).squeeze(1)
+        pt = p.gather(1, targets.unsqueeze(1)).squeeze(1)
+        focal_weight = (1 - pt) ** self.gamma
+        loss = -focal_weight * log_pt
+        if self.alpha is not None:
+            alpha = self.alpha
+            if not isinstance(alpha, torch.Tensor):
+                alpha = torch.tensor(alpha, dtype=inputs.dtype, device=inputs.device)
+            at = alpha.gather(0, targets)
+            loss = at * loss
+        return loss.mean() if self.reduction == "mean" else loss.sum()
+
+
+class FocalLossSigmoid(nn.Module):
+    """Per-class focal loss for multi-label sigmoid outputs (BCE variant).
+
+    Args:
+        gamma: Focusing parameter.
+        alpha: Balance factor between positive/negative examples (0-1).
+        reduction: 'mean' or 'sum'.
+    """
+
+    def __init__(self, gamma=2.0, alpha=0.25, reduction="mean"):
+        super().__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+        self.reduction = reduction
+
+    def forward(self, inputs, targets):
+        # inputs: [B, C] logits, targets: [B, C] float one-hot
+        p = torch.sigmoid(inputs)
+        bce = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
+        p_t = p * targets + (1 - p) * (1 - targets)
+        alpha_t = self.alpha * targets + (1 - self.alpha) * (1 - targets)
+        focal_weight = alpha_t * (1 - p_t) ** self.gamma
+        loss = focal_weight * bce
+        return loss.mean() if self.reduction == "mean" else loss.sum()
+
+
+def build_criterion(loss_fn, model_opts=None):
     """
     Construct a loss criterion from a string identifier.
 
     Args:
-        loss_fn: One of 'cross_entropy', 'bce_sigmoid'
+        loss_fn: One of 'cross_entropy', 'bce_sigmoid', 'focal_loss',
+                 'focal_loss_sigmoid'
+        model_opts: The model config dict (used to read focal_gamma / focal_alpha).
 
     Returns:
         nn.Module: The loss criterion
@@ -62,9 +126,18 @@ def build_criterion(loss_fn):
         return nn.CrossEntropyLoss()
     elif loss_fn == "bce_sigmoid":
         return nn.BCEWithLogitsLoss()
+    elif loss_fn == "focal_loss":
+        gamma = model_opts.get("focal_gamma", 2.0) if model_opts else 2.0
+        alpha = model_opts.get("focal_alpha", None) if model_opts else None
+        return FocalLoss(gamma=gamma, alpha=alpha)
+    elif loss_fn == "focal_loss_sigmoid":
+        gamma = model_opts.get("focal_gamma", 2.0) if model_opts else 2.0
+        alpha = model_opts.get("focal_alpha", 0.25) if model_opts else 0.25
+        return FocalLossSigmoid(gamma=gamma, alpha=alpha)
     else:
         raise ValueError(
-            f"Unknown loss_fn: {loss_fn!r}. Supported values: 'cross_entropy', 'bce_sigmoid'."
+            f"Unknown loss_fn: {loss_fn!r}. Supported values: "
+            "'cross_entropy', 'bce_sigmoid', 'focal_loss', 'focal_loss_sigmoid'."
         )
 
 
@@ -83,7 +156,7 @@ def prepare_targets_for_loss(targets, num_classes, loss_fn):
     Returns:
         Tensor in the correct dtype/shape for the criterion
     """
-    if loss_fn == "bce_sigmoid":
+    if loss_fn in ("bce_sigmoid", "focal_loss_sigmoid"):
         return nn.functional.one_hot(targets, num_classes).float()
     return targets
 
@@ -99,7 +172,7 @@ def logits_to_probs(outputs, loss_fn):
     Returns:
         Tensor of probabilities [B, num_classes]
     """
-    if loss_fn == "bce_sigmoid":
+    if loss_fn in ("bce_sigmoid", "focal_loss_sigmoid"):
         return torch.sigmoid(outputs)
     return torch.softmax(outputs, dim=1)
 
@@ -940,7 +1013,7 @@ def train_model(options, trial=None, results_dir_override=None):
     # Training components
     dynamic_unfreeze_opts = options["training"].get("dynamic_unfreeze")
     loss_fn = options["model"].get("loss_fn", "cross_entropy")
-    criterion = build_criterion(loss_fn)
+    criterion = build_criterion(loss_fn, model_opts=options["model"])
     optimizer = create_optimizer(
         model, options, backbone_name,
         dynamic_unfreeze_mode=bool(dynamic_unfreeze_opts)
