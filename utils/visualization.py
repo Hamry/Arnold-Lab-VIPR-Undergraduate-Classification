@@ -417,33 +417,45 @@ def plot_experiment_summary(experiment_name, save=True, show=False, results_dir=
         ax.set_title('Loss Curves')
         ax.legend(loc='upper right')
 
-        # Top-right: Accuracy curves
+        # Top-right: F1 score curves (train and val)
         ax = axes[0, 1]
-        ax.plot(metrics['epoch'], metrics['val_acc_top1'] * 100,
-                color=COLORS[0], linewidth=2, label='Validation Accuracy')
+        f1_cols = [c for c in metrics.columns if c.startswith('val_f1_')]
+        if f1_cols:
+            val_macro_f1 = metrics[f1_cols].mean(axis=1)
+            ax.plot(metrics['epoch'], val_macro_f1,
+                    color=COLORS[1], linewidth=2, label='Val F1')
+        if 'train_macro_f1' in metrics.columns:
+            ax.plot(metrics['epoch'], metrics['train_macro_f1'],
+                    color=COLORS[0], linewidth=2, label='Train F1')
         ax.set_xlabel('Epoch')
-        ax.set_ylabel('Accuracy (%)')
-        ax.set_title('Validation Accuracy')
+        ax.set_ylabel('F1 Score')
+        ax.set_title('F1 Score')
         ax.legend(loc='lower right')
-        ax.set_ylim(0, 105)
+        ax.set_ylim(0, 1.05)
 
-        # Bottom-left: Learning rate
+        # Bottom-left: Per-class F1 score over epochs
         ax = axes[1, 0]
-        ax.plot(metrics['epoch'], metrics['lr'],
-                color=COLORS[4], linewidth=2)
+        f1_cols = [c for c in metrics.columns if c.startswith('val_f1_')]
+        for i, col in enumerate(f1_cols):
+            class_name = col.replace('val_f1_', '').capitalize()
+            ax.plot(metrics['epoch'], metrics[col],
+                    color=COLORS[i % len(COLORS)], linewidth=2, label=class_name)
         ax.set_xlabel('Epoch')
-        ax.set_ylabel('Learning Rate')
-        ax.set_title('Learning Rate Schedule')
-        ax.ticklabel_format(axis='y', style='scientific', scilimits=(0, 0))
+        ax.set_ylabel('F1 Score')
+        ax.set_title('Per-Class F1 Score')
+        ax.legend(loc='lower right')
+        ax.set_ylim(0, 1.05)
 
         # Bottom-right: Results table
         ax = axes[1, 1]
         ax.axis('off')
 
         if has_results:
+            f1_cols = [c for c in metrics.columns if c.startswith('val_f1_')]
+            best_val_f1 = metrics[f1_cols].mean(axis=1).max() if f1_cols else None
             table_data = [
                 ['Metric', 'Value'],
-                ['Best Val Acc', f"{results['best_val_acc_top1']:.2%}"],
+                ['Best Val F1', f"{best_val_f1:.4f}" if best_val_f1 is not None else 'N/A'],
                 ['Test Acc', f"{results['final_test_acc_top1']:.2%}"],
                 ['Best Epoch', str(results['best_epoch'])],
                 ['Inference (ms)', f"{results['inference_time_ms']:.2f}"],

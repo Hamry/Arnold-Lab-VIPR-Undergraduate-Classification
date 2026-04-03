@@ -6,17 +6,17 @@
         "freeze_backbone": true,
         "classifier_hidden": [1024],
         "dropout": 0.2,
-        "loss_fn": "bce_sigmoid"
+        "loss_fn": "focal_loss_sigmoid"
     },
     "data": {
-        "path": "/work/omlpa/HL98745/data/single_label_category_balanced_filtered",
+        "path": "/work/omlpa/HL98745/data/single_label_category_balanced_filtered_auto",
         "input_size": 224,
         "batch_size": 32,
         "num_workers": 8
     },
     "augmentations": {
         "horizontal_flip": true,
-        "vertical_flip": false,
+        "vertical_flip": true,
         "random_rotation": 15,
         "color_jitter": 0.1,
         "random_crop_scale": [0.8, 1.0]

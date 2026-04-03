@@ -1,7 +1,7 @@
 {
-    "study_name": "sigmoid_granular/resnet152_sigmoid_frozen_granular",
+    "study_name": "sigmoid_focal/resnet152_sigmoid_frozen_granular",
     "base_config_path": "configs/base_config_sigmoid/resnet152_sigmoid.json",
-    "n_trials": 50,
+    "n_trials": 75,
     "timeout_hours": 24,
     "pruning": {
         "enabled": false
@@ -38,6 +38,16 @@
             "size_high": 2048
         },
         "model.dropout": {
+            "type": "float",
+            "low": 0.1,
+            "high": 0.5
+        },
+        "model.focal_gamma": {
+            "type": "float",
+            "low": 0.5,
+            "high": 3.0
+        },
+        "model.focal_alpha": {
             "type": "float",
             "low": 0.1,
             "high": 0.5
