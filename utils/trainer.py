@@ -517,10 +517,12 @@ def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, devi
     Train for one epoch with mixed precision.
 
     Returns:
-        float: Average training loss for the epoch
+        tuple: (avg_train_loss, train_macro_f1)
     """
     model.train()
     total_loss = 0.0
+    all_targets = []
+    all_predictions = []
 
     for inputs, targets in loader:
         inputs, targets = inputs.to(device), targets.to(device)
@@ -540,8 +542,13 @@ def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler, devi
             scheduler.step()
 
         total_loss += loss.item()
+        _, predicted = outputs.max(1)
+        all_targets.extend(targets.cpu().tolist())
+        all_predictions.extend(predicted.cpu().tolist())
 
-    return total_loss / len(loader)
+    num_classes = outputs.size(1)
+    _, _, _, _, macro_f1, _, _ = compute_per_class_metrics(all_targets, all_predictions, num_classes)
+    return total_loss / len(loader), macro_f1
 
 
 def evaluate(model, loader, criterion, device, loss_fn="cross_entropy"):
@@ -733,11 +740,11 @@ def save_config(options, results_dir):
 def init_metrics_file(results_dir, class_names):
     """Initialize the metrics CSV file with headers.
 
-    Columns: epoch, train_loss, val_loss, val_acc_top1, lr,
+    Columns: epoch, train_loss, val_loss, val_acc_top1, lr, train_macro_f1,
              val_f1_<class> * N, val_acc_<class> * N
     """
     metrics_path = results_dir / "metrics.csv"
-    headers = ["epoch", "train_loss", "val_loss", "val_acc_top1", "lr"]
+    headers = ["epoch", "train_loss", "val_loss", "val_acc_top1", "lr", "train_macro_f1"]
     headers += [f"val_f1_{c.lower()}"  for c in class_names]
     headers += [f"val_acc_{c.lower()}" for c in class_names]
     with open(metrics_path, "w", newline="") as f:
@@ -746,7 +753,7 @@ def init_metrics_file(results_dir, class_names):
     return metrics_path
 
 
-def append_metrics(metrics_path, epoch, train_loss, val_metrics, lr, class_names):
+def append_metrics(metrics_path, epoch, train_loss, train_macro_f1, val_metrics, lr, class_names):
     """Append one row of metrics to the CSV file."""
     row = [
         epoch,
@@ -754,6 +761,7 @@ def append_metrics(metrics_path, epoch, train_loss, val_metrics, lr, class_names
         f"{val_metrics['loss']:.4f}",
         f"{val_metrics['acc_top1']:.4f}",
         f"{lr:.6f}",
+        f"{train_macro_f1:.4f}",
     ]
     # Per-class F1 then per-class accuracy, in class_names order
     for c in class_names:
@@ -1067,7 +1075,7 @@ def train_model(options, trial=None, results_dir_override=None):
             total, trainable = count_parameters(model)
             print(f"  Trainable: {trainable:,} / {total:,}\n")
 
-        train_loss = train_one_epoch(
+        train_loss, train_macro_f1 = train_one_epoch(
             model, train_loader, criterion, optimizer, scheduler, scaler, device,
             loss_fn=loss_fn
         )
@@ -1125,7 +1133,7 @@ def train_model(options, trial=None, results_dir_override=None):
             best_epoch = epoch
             save_checkpoint(model, results_dir)
 
-        append_metrics(metrics_path, epoch, train_loss, val_metrics, current_lr, class_names)
+        append_metrics(metrics_path, epoch, train_loss, train_macro_f1, val_metrics, current_lr, class_names)
         print_epoch_summary(epoch, epochs, train_loss, val_metrics, current_lr, is_best)
 
         if early_stopping.should_stop:
