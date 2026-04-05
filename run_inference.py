@@ -337,6 +337,50 @@ def plot_per_class_confidence(df, out_dir: str, backbone_name: str):
     print(f"  Saved → {out}")
 
 
+def plot_opaque_vs_blurry(df, out_dir: str, backbone_name: str):
+    """Scatter: Opaque probability vs Blurry probability, colored by predicted class."""
+    fig, ax = plt.subplots(figsize=(7, 7))
+
+    color_map = dict(zip(CLASS_NAMES, COLORS))
+    for cls in CLASS_NAMES:
+        mask = df["predicted"] == cls
+        ax.scatter(
+            df.loc[mask, "Opaque"],
+            df.loc[mask, "Blurry"],
+            c=color_map[cls],
+            label=cls,
+            alpha=0.35,
+            s=4,
+            linewidths=0,
+        )
+
+    # y = x diagonal
+    lims = [
+        min(ax.get_xlim()[0], ax.get_ylim()[0]),
+        max(ax.get_xlim()[1], ax.get_ylim()[1]),
+    ]
+    ax.plot(lims, lims, color="black", linewidth=1.0, linestyle="--", label="y = x", zorder=5)
+    ax.set_xlim(lims)
+    ax.set_ylim(lims)
+
+    ax.set_xlabel("Opaque probability", fontsize=11)
+    ax.set_ylabel("Blurry probability", fontsize=11)
+    ax.set_title(
+        f"Opaque vs Blurry — {backbone_name}\n(n={len(df):,} images)",
+        fontsize=12,
+        fontweight="bold",
+    )
+    ax.legend(fontsize=9, markerscale=3, loc="upper left")
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.set_aspect("equal", adjustable="box")
+
+    plt.tight_layout()
+    out = os.path.join(out_dir, "opaque_vs_blurry.png")
+    plt.savefig(out, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"  Saved → {out}")
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────────
 def parse_args():
     p = argparse.ArgumentParser(
@@ -390,6 +434,7 @@ def run_analysis(df, class_f1: dict, out_dir: str, backbone_name: str):
     plot_class_distribution(df, class_f1, out_dir, backbone_name)
     plot_confidence(df, out_dir, backbone_name)
     plot_per_class_confidence(df, out_dir, backbone_name)
+    plot_opaque_vs_blurry(df, out_dir, backbone_name)
 
 
 def main():
