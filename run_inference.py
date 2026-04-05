@@ -18,7 +18,6 @@ import argparse
 import csv
 import glob
 import json
-import math
 import os
 import sys
 from pathlib import Path
@@ -280,47 +279,6 @@ def plot_class_distribution(df, class_f1: dict, out_dir: str, backbone_name: str
             fontsize=9,
         )
 
-    # Overlay corrected estimates + 95% CI if F1 available
-    if class_f1:
-        x_positions = range(len(CLASS_NAMES))
-        mu_vals, ci_lo, ci_hi = [], [], []
-
-        for cls in CLASS_NAMES:
-            f1 = class_f1.get(cls)
-            n_c = counts[cls]
-            if f1 and f1 > 0 and n_c > 0:
-                mu = n_c / f1
-                se = math.sqrt(n_c * (1 - f1)) / f1
-                mu_vals.append(mu)
-                ci_lo.append(mu - 1.96 * se)
-                ci_hi.append(mu + 1.96 * se)
-            else:
-                mu_vals.append(None)
-                ci_lo.append(None)
-                ci_hi.append(None)
-
-        # Plot markers and error bars only where data is valid
-        for i, (mu, lo, hi) in enumerate(zip(mu_vals, ci_lo, ci_hi)):
-            if mu is None:
-                continue
-            err_lo = mu - max(lo, 0)  # clamp lower bound to 0
-            err_hi = hi - mu
-            ax.errorbar(
-                i,
-                mu,
-                yerr=[[err_lo], [err_hi]],
-                fmt="D",  # diamond marker
-                color="black",
-                markersize=6,
-                capsize=5,
-                capthick=1.5,
-                linewidth=1.5,
-                zorder=5,
-                label="Corrected estimate ± 95% CI" if i == 0 else "_nolegend_",
-            )
-
-        ax.legend(fontsize=9, loc="upper right")
-
     plt.tight_layout()
     out = os.path.join(out_dir, "class_distribution.png")
     plt.savefig(out, dpi=150, bbox_inches="tight")
@@ -353,10 +311,42 @@ def plot_confidence(df, out_dir: str, backbone_name: str):
     print(f"  Saved → {out}")
 
 
+def plot_per_class_confidence(df, out_dir: str, backbone_name: str):
+    """2×2 grid: confidence distribution for each predicted class."""
+    fig, axes = plt.subplots(2, 2, figsize=(10, 7))
+    axes = axes.flatten()
+
+    for ax, cls, color in zip(axes, CLASS_NAMES, COLORS):
+        subset = df[df["predicted"] == cls]["confidence"]
+        ax.hist(subset, bins=30, color=color, edgecolor="white", linewidth=0.4)
+        ax.set_title(f"{cls}  (n={len(subset):,})", fontsize=11, fontweight="bold")
+        ax.set_xlabel("Confidence (max softmax prob)")
+        ax.set_ylabel("Count")
+        ax.spines[["top", "right"]].set_visible(False)
+
+    fig.suptitle(
+        f"Per-class confidence distribution — {backbone_name}",
+        fontsize=13,
+        fontweight="bold",
+        y=1.01,
+    )
+    plt.tight_layout()
+    out = os.path.join(out_dir, "confidence_per_class.png")
+    plt.savefig(out, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"  Saved → {out}")
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────────
 def parse_args():
     p = argparse.ArgumentParser(
-        description="Run inference using a trained model from a results folder."
+        description="Run inference using a trained model from a results folder, "
+        "or regenerate plots/analysis from an existing predictions CSV.",
+        epilog=(
+            "Normal run:  python run_inference.py --result-dir <dir> --data <images/>\n"
+            "Regen plots: python run_inference.py --result-dir <dir> --csv predictions_<backbone>.csv"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p.add_argument(
         "--result-dir",
@@ -365,23 +355,78 @@ def parse_args():
     )
     p.add_argument(
         "--data",
-        required=True,
-        help="Root directory to scan for .png files (recursive)",
+        default=None,
+        help="Root directory to scan for .png files (required unless --csv is given)",
+    )
+    p.add_argument(
+        "--csv",
+        default=None,
+        metavar="PREDICTIONS_CSV",
+        help="Path to an existing predictions CSV — skips inference and regenerates plots only",
     )
     p.add_argument(
         "--output-dir",
         default=None,
-        help="Output directory for CSV and plots (default: <result-dir>/inference_output)",
+        help="Output directory for plots (default: <result-dir>/inference_output, "
+        "or the CSV's parent directory when --csv is used)",
     )
     p.add_argument("--batch-size", type=int, default=BATCH_SIZE)
     p.add_argument("--workers", type=int, default=4, help="DataLoader num_workers")
     return p.parse_args()
 
 
+def run_analysis(df, class_f1: dict, out_dir: str, backbone_name: str):
+    """
+    Single edit point for all post-inference analysis and plots.
+
+    Add new graphs or calculations here — they will automatically apply
+    to both normal inference runs and plot-regeneration runs.
+    """
+    counts = print_class_frequency(df, backbone_name)
+    print_corrected_frequency(counts, class_f1, backbone_name)
+    print_high_confidence_good(df)
+
+    print("\nGenerating plots …")
+    plot_class_distribution(df, class_f1, out_dir, backbone_name)
+    plot_confidence(df, out_dir, backbone_name)
+    plot_per_class_confidence(df, out_dir, backbone_name)
+
+
 def main():
     args = parse_args()
 
     result_dir = Path(args.result_dir).resolve()
+
+    # ── Regeneration mode: skip inference, load existing CSV ──────────────────
+    if args.csv:
+        csv_path = Path(args.csv).resolve()
+        if not csv_path.exists():
+            print(f"[ERROR] CSV not found: {csv_path}", file=sys.stderr)
+            sys.exit(1)
+
+        out_dir = (
+            Path(args.output_dir).resolve()
+            if args.output_dir
+            else csv_path.parent
+        )
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        backbone_name = csv_path.stem.replace("predictions_", "")
+        print(f"Regenerating plots for {backbone_name} from {csv_path} …")
+
+        class_f1 = load_class_f1(result_dir)
+        df = load_predictions(str(csv_path))
+        run_analysis(df, class_f1, str(out_dir), backbone_name)
+        print(f"\nAll outputs written to {out_dir}")
+        return
+
+    # ── Normal inference mode ─────────────────────────────────────────────────
+    if not args.data:
+        print(
+            "[ERROR] --data is required when not using --csv.", file=sys.stderr
+        )
+        sys.exit(1)
+
     out_dir = (
         Path(args.output_dir).resolve()
         if args.output_dir
@@ -395,7 +440,7 @@ def main():
     # 2. Load per-class F1 for CI
     class_f1 = load_class_f1(result_dir)
 
-    # 3. Run inference
+    # 3. Run inference → CSV
     out_csv = str(out_dir / f"predictions_{backbone_name}.csv")
     run_inference(
         model,
@@ -407,17 +452,9 @@ def main():
         num_workers=args.workers,
     )
 
-    # 4. Load predictions and analyse
+    # 4. Analyse and plot
     df = load_predictions(out_csv)
-
-    counts = print_class_frequency(df, backbone_name)
-    print_corrected_frequency(counts, class_f1, backbone_name)
-    print_high_confidence_good(df)
-
-    # 5. Plots
-    print("\nGenerating plots …")
-    plot_class_distribution(df, class_f1, str(out_dir), backbone_name)
-    plot_confidence(df, str(out_dir), backbone_name)
+    run_analysis(df, class_f1, str(out_dir), backbone_name)
 
     print(f"\nAll outputs written to {out_dir}")
 
