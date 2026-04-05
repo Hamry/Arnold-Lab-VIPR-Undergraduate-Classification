@@ -95,7 +95,7 @@ def load_model_from_result_dir(result_dir: Path):
 
     backbone_name = options["model"]["backbone"]
     input_size = options["data"]["input_size"]
-    loss_fn = options["model"].get("loss_fn", "cross_entropy")
+    loss_fn = options["model"].get("loss_fn", "focal_loss_sigmoid")
 
     print(f"Building {backbone_name} (input={input_size}px) …")
     model = load_model(options)
