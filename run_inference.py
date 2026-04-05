@@ -141,7 +141,7 @@ def run_inference(
     data_dir: str,
     out_csv: str,
     input_size: int,
-    loss_fn: str = "cross_entropy",
+    loss_fn: str = "focal_loss_sigmoid",
     batch_size: int = BATCH_SIZE,
     num_workers: int = 4,
 ):
@@ -359,7 +359,15 @@ def plot_opaque_vs_blurry(df, out_dir: str, backbone_name: str):
         min(ax.get_xlim()[0], ax.get_ylim()[0]),
         max(ax.get_xlim()[1], ax.get_ylim()[1]),
     ]
-    ax.plot(lims, lims, color="black", linewidth=1.0, linestyle="--", label="y = x", zorder=5)
+    ax.plot(
+        lims,
+        lims,
+        color="black",
+        linewidth=1.0,
+        linestyle="--",
+        label="y = x",
+        zorder=5,
+    )
     ax.set_xlim(lims)
     ax.set_ylim(lims)
 
@@ -450,9 +458,7 @@ def main():
             sys.exit(1)
 
         out_dir = (
-            Path(args.output_dir).resolve()
-            if args.output_dir
-            else csv_path.parent
+            Path(args.output_dir).resolve() if args.output_dir else csv_path.parent
         )
         out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -467,9 +473,7 @@ def main():
 
     # ── Normal inference mode ─────────────────────────────────────────────────
     if not args.data:
-        print(
-            "[ERROR] --data is required when not using --csv.", file=sys.stderr
-        )
+        print("[ERROR] --data is required when not using --csv.", file=sys.stderr)
         sys.exit(1)
 
     out_dir = (
