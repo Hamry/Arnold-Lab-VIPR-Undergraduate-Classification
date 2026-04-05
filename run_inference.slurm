@@ -41,30 +41,26 @@ echo "PyTorch version: $(python -c 'import torch; print(torch.__version__)')"
 echo "CUDA available: $(python -c 'import torch; print(torch.cuda.is_available())')"
 echo ""
 
-# Arguments (override via: sbatch run_inference.slurm <result-dir> <data-dir> [output-dir])
-RESULT_DIR="${1:?ERROR: result-dir argument is required. Usage: sbatch run_inference.slurm <result-dir> <data-dir> [output-dir]}"
-DATA_DIR="${2:?ERROR: data-dir argument is required. Usage: sbatch run_inference.slurm <result-dir> <data-dir> [output-dir]}"
-OUTPUT_DIR="${3:-}"
+# Arguments: <result-dir> (required)  [output-dir] (optional)  [data-pattern] (optional)
+# Examples:
+#   sbatch run_inference.slurm <result-dir>
+#   sbatch run_inference.slurm <result-dir> /scratch/hl98745/out
+#   sbatch run_inference.slurm <result-dir> /scratch/hl98745/out "/work/omlpa/SAM/2024*_data/"
+RESULT_DIR="${1:?ERROR: result-dir argument is required. Usage: sbatch run_inference.slurm <result-dir> [output-dir] [data-pattern]}"
+OUTPUT_DIR="${2:-}"
+DATA_PATTERN="${3:-}"
 
 echo "======================================================================"
-echo "Result dir : $RESULT_DIR"
-echo "Data dir   : $DATA_DIR"
-echo "Output dir : ${OUTPUT_DIR:-<result-dir>/inference_output}"
+echo "Result dir   : $RESULT_DIR"
+echo "Output dir   : ${OUTPUT_DIR:-<result-dir>/inference_output}"
+echo "Data pattern : ${DATA_PATTERN:-<default: /work/omlpa/SAM/*_data/>}"
 echo "======================================================================"
 echo ""
 
-if [ -n "$OUTPUT_DIR" ]; then
-    python run_inference.py \
-        --result-dir "$RESULT_DIR" \
-        --data "$DATA_DIR" \
-        --output-dir "$OUTPUT_DIR" \
-        --workers 8
-else
-    python run_inference.py \
-        --result-dir "$RESULT_DIR" \
-        --data "$DATA_DIR" \
-        --workers 8
-fi
+CMD="python run_inference.py --result-dir \"$RESULT_DIR\" --workers 8"
+[ -n "$OUTPUT_DIR"   ] && CMD="$CMD --output-dir \"$OUTPUT_DIR\""
+[ -n "$DATA_PATTERN" ] && CMD="$CMD --data \"$DATA_PATTERN\""
+eval $CMD
 
 echo ""
 echo "======================================================================"

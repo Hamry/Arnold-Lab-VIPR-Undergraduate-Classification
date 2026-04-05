@@ -44,20 +44,29 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Colorblind-friendly IBM palette (matches utils/visualization.py)
 COLORS = ["#648FFF", "#DC267F", "#FFB000", "#FE6100"]
 
+DEFAULT_DATA_PATTERN = "/work/omlpa/SAM/*_data/"
+
 
 # ── dataset ───────────────────────────────────────────────────────────────────
 class PNGDataset(Dataset):
-    """Recursively finds all .png files under root_dir."""
+    """Recursively finds all .png files under a directory or glob pattern."""
 
-    def __init__(self, root_dir: str, input_size: int, transform=None):
+    def __init__(self, data_pattern: str, input_size: int, transform=None):
         self.input_size = input_size
         self.transform = transform
-        self.paths = sorted(
-            glob.glob(os.path.join(root_dir, "**", "*.png"), recursive=True)
-        )
+
+        matched_roots = sorted(glob.glob(data_pattern))
+        if not matched_roots:
+            raise FileNotFoundError(f"No directories matched pattern: {data_pattern}")
+
+        all_paths = []
+        for root in matched_roots:
+            all_paths.extend(glob.glob(os.path.join(root, "**", "*.png"), recursive=True))
+
+        self.paths = sorted(all_paths)
         if not self.paths:
-            raise FileNotFoundError(f"No PNG files found under: {root_dir}")
-        print(f"Found {len(self.paths):,} PNG files under {root_dir}")
+            raise FileNotFoundError(f"No PNG files found under pattern: {data_pattern}")
+        print(f"Found {len(self.paths):,} PNG files across {len(matched_roots)} director(ies) matching {data_pattern}")
 
     def __len__(self):
         return len(self.paths)
@@ -407,8 +416,8 @@ def parse_args():
     )
     p.add_argument(
         "--data",
-        default=None,
-        help="Root directory to scan for .png files (required unless --csv is given)",
+        default=DEFAULT_DATA_PATTERN,
+        help=f"Directory or glob pattern to scan for .png files (default: {DEFAULT_DATA_PATTERN})",
     )
     p.add_argument(
         "--csv",
@@ -472,10 +481,6 @@ def main():
         return
 
     # ── Normal inference mode ─────────────────────────────────────────────────
-    if not args.data:
-        print("[ERROR] --data is required when not using --csv.", file=sys.stderr)
-        sys.exit(1)
-
     out_dir = (
         Path(args.output_dir).resolve()
         if args.output_dir
