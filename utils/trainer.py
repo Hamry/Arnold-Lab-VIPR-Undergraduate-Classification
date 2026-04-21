@@ -1002,6 +1002,9 @@ def train_model(options, trial=None, results_dir_override=None):
         results_dir.mkdir(parents=True, exist_ok=True)
     else:
         results_dir = create_results_dir(experiment_name)
+    # Resolve loss_fn before saving so config.json always records it explicitly
+    loss_fn = options["model"].get("loss_fn", "cross_entropy")
+    options["model"]["loss_fn"] = loss_fn
     save_config(options, results_dir)
 
     # Data
@@ -1020,7 +1023,6 @@ def train_model(options, trial=None, results_dir_override=None):
 
     # Training components
     dynamic_unfreeze_opts = options["training"].get("dynamic_unfreeze")
-    loss_fn = options["model"].get("loss_fn", "cross_entropy")
     criterion = build_criterion(loss_fn, model_opts=options["model"])
     optimizer = create_optimizer(
         model, options, backbone_name,

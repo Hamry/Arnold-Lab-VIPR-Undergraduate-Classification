@@ -9,6 +9,7 @@ A config-driven deep learning framework for benchmarking pretrained CNN/Transfor
   - [Single Experiment](#1-single-experiment)
   - [Batch Experiments](#2-batch-experiments-multiple-models)
   - [Optuna Hyperparameter Optimization](#3-optuna-hyperparameter-optimization)
+- [Inference on Trained Models](#inference-on-trained-models)
 - [Configuration Reference](#configuration-reference)
   - [Standard Training Config](#standard-training-config)
   - [Progressive Unfreezing Config](#progressive-unfreezing-thaw-config)
@@ -142,6 +143,64 @@ sbatch run_optuna.slurm configs/optuna/resnet152_sweep.json --resume
 ```
 
 The Optuna SLURM script allocates: 1x A100 GPU, 8 CPUs, 64GB RAM, 48 hours.
+
+---
+
+## Inference on Trained Models
+
+Run batch inference on a directory of PNG images using any trained model. The script loads the model architecture and weights from a results folder, classifies every image, and produces a predictions CSV plus two summary plots.
+
+### Usage
+
+**Normal inference (load model and run on new images):**
+```bash
+python run_inference.py \
+    --result-dir results/resnet152_frozen \
+    --data /path/to/images \
+    --output-dir inference_output/resnet152
+```
+
+**From an Optuna best trial:**
+```bash
+python run_inference.py \
+    --result-dir results/optuna_studies/swin_b_sweep/best \
+    --data /path/to/images
+```
+
+**Regenerate plots from an existing predictions CSV (no GPU required):**
+```bash
+python run_inference.py \
+    --result-dir results/resnet152_frozen \
+    --csv inference_output/resnet152/predictions_resnet152.csv
+```
+
+When `--csv` is given the model is never loaded — only the analysis and plots are re-run. The output files overwrite any existing plots in the same directory.
+
+### Arguments
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--result-dir` | path | required | Results folder containing `config.json`, `best_model.pth`, and `results.json` |
+| `--data` | path | — | Root directory to scan for `.png` files recursively (required unless `--csv` is given) |
+| `--csv` | path | — | Path to an existing predictions CSV — skips inference and regenerates plots only |
+| `--output-dir` | path | `<result-dir>/inference_output` | Output directory for CSV and plots (defaults to the CSV's parent directory when `--csv` is used) |
+| `--batch-size` | int | 32 | Batch size for inference |
+| `--workers` | int | 4 | DataLoader worker processes |
+
+### Output Files
+
+```
+output_dir/
+├── predictions_<backbone>.csv      # Per-image class probabilities (columns: filename, Blurry, Good, Opaque, Yellow)
+├── class_distribution.png          # Bar chart of predicted counts with corrected estimates ± 95% CI
+└── confidence_distribution.png     # Histogram of max class probability per image
+```
+
+The corrected estimates on the bar chart divide each class's predicted count by its per-class F1 score (loaded from `results.json`) to approximate the true class count. The 95% CI error bars use a delta-method approximation.
+
+### Extending Plots and Analysis
+
+All analysis and plotting calls are consolidated in the `run_analysis()` function in `run_inference.py`. Add new graphs or calculations there and they will automatically apply to both normal inference runs and regeneration runs.
 
 ---
 
