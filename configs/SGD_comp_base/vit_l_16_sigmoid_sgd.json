@@ -1,0 +1,34 @@
+{
+    "experiment_name": "vit_l_16_sigmoid_sgd_frozen",
+    "model": {
+        "backbone": "vit_l_16",
+        "pretrained": true,
+        "freeze_backbone": true,
+        "classifier_hidden": [1024],
+        "dropout": 0.2,
+        "loss_fn": "focal_loss_sigmoid"
+    },
+    "data": {
+        "path": "/work/omlpa/HL98745/data/single_label_category_balanced_filtered_auto",
+        "input_size": 224,
+        "batch_size": 16,
+        "num_workers": 8
+    },
+    "augmentations": {
+        "horizontal_flip": true,
+        "vertical_flip": true,
+        "random_rotation": 15,
+        "color_jitter": 0.1,
+        "random_crop_scale": [0.8, 1.0]
+    },
+    "training": {
+        "epochs": 50,
+        "learning_rate": 0.0001,
+        "optimizer": "sgd",
+        "momentum": 0.9,
+        "weight_decay": 0.01,
+        "scheduler": "cosine",
+        "seed": 42,
+        "early_stopping_patience": 20
+    }
+}

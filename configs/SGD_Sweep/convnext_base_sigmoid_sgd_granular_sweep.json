@@ -1,0 +1,61 @@
+{
+    "study_name": "sgd_focal/convnext_base_sigmoid_sgd_frozen_granular",
+    "base_config_path": "configs/SGD_comp_base/convnext_base_sigmoid_sgd.json",
+    "n_trials": 75,
+    "timeout_hours": 24,
+    "pruning": {
+        "enabled": false
+    },
+    "cleanup": {
+        "keep_top_n": 5,
+        "cleanup_frequency": 10
+    },
+    "search_space": {
+        "training.learning_rate": {
+            "type": "log_float",
+            "low": 1e-4,
+            "high": 1e-2
+        },
+        "training.weight_decay": {
+            "type": "log_float",
+            "low": 1e-5,
+            "high": 1e-2
+        },
+        "training.momentum": {
+            "type": "float",
+            "low": 0.8,
+            "high": 0.99
+        },
+        "augmentations.color_jitter": {
+            "type": "float",
+            "low": 0.0,
+            "high": 0.15
+        },
+        "augmentations.random_rotation": {
+            "type": "float",
+            "low": 0.0,
+            "high": 30.0
+        },
+        "model.classifier_hidden": {
+            "type": "hidden_layers",
+            "n_layers": [1, 2],
+            "size_low": 128,
+            "size_high": 2048
+        },
+        "model.dropout": {
+            "type": "float",
+            "low": 0.1,
+            "high": 0.5
+        },
+        "model.focal_gamma": {
+            "type": "float",
+            "low": 0.5,
+            "high": 3.0
+        },
+        "model.focal_alpha": {
+            "type": "float",
+            "low": 0.1,
+            "high": 0.5
+        }
+    }
+}

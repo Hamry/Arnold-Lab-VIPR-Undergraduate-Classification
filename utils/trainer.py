@@ -394,7 +394,8 @@ def create_optimizer(model, options, backbone_name=None, dynamic_unfreeze_mode=F
     elif optimizer_name == "adam":
         return torch.optim.Adam(param_groups, weight_decay=weight_decay)
     elif optimizer_name == "sgd":
-        return torch.optim.SGD(param_groups, momentum=0.9, weight_decay=weight_decay)
+        momentum = train_opts.get("momentum", 0.9)
+        return torch.optim.SGD(param_groups, momentum=momentum, weight_decay=weight_decay)
     else:
         raise ValueError(f"Unknown optimizer: {optimizer_name}")
 
